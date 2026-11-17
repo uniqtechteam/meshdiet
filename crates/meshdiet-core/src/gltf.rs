@@ -3,7 +3,7 @@
 //! Deliberately tolerant (ADR-003): every field is optional or defaulted and unknown keys and
 //! extensions are kept or ignored, so a half-broken file can still be reported on.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde::Deserialize;
 use serde_json::Value;
@@ -54,6 +54,10 @@ pub struct Document {
     pub images: Vec<Image>,
     /// Textures.
     pub textures: Vec<Texture>,
+    /// Every bufferView index named by a `bufferView` key anywhere in the JSON: accessors, sparse
+    /// parts, images and extensions such as Draco.
+    #[serde(skip)]
+    pub view_refs: BTreeSet<usize>,
     /// Materials (only counted and named).
     pub materials: Vec<Named>,
 }
@@ -265,12 +269,38 @@ impl Document {
     /// When the bytes are not JSON or a field has the wrong type.
     pub fn parse(json: &[u8]) -> Result<Self, String> {
         let json = json.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(json);
-        serde_json::from_slice(json).map_err(|e| format!("the glTF JSON cannot be read: {e}"))
+        let value: Value = serde_json::from_slice(json)
+            .map_err(|e| format!("the glTF JSON cannot be read: {e}"))?;
+        let mut doc =
+            Self::deserialize(&value).map_err(|e| format!("the glTF JSON cannot be read: {e}"))?;
+        collect_view_refs(&value, &mut doc.view_refs);
+        Ok(doc)
     }
 
     /// Whether `extensionsUsed` lists `name`.
     #[must_use]
     pub fn uses(&self, name: &str) -> bool {
         self.extensions_used.iter().any(|e| e == name)
+    }
+}
+
+/// Gather the value of every `bufferView` key in `value`, at any depth.
+fn collect_view_refs(value: &Value, out: &mut BTreeSet<usize>) {
+    let mut stack = vec![value];
+    while let Some(v) = stack.pop() {
+        match v {
+            Value::Object(map) => {
+                for (key, child) in map {
+                    if key == "bufferView"
+                        && let Some(i) = child.as_u64().and_then(|i| usize::try_from(i).ok())
+                    {
+                        out.insert(i);
+                    }
+                    stack.push(child);
+                }
+            }
+            Value::Array(items) => stack.extend(items),
+            _ => {}
+        }
     }
 }
