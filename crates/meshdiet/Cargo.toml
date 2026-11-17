@@ -1,0 +1,19 @@
+[package]
+name = "meshdiet"
+description = "Find the 3D models that make your website slow: audits GLB and glTF weight."
+readme = "../../README.md"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+meshdiet-core.workspace = true
+clap.workspace = true
+
+[lints]
+workspace = true

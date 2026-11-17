@@ -1,0 +1,9 @@
+# Keep LF everywhere so fixtures and output snapshots match on every OS.
+* text=auto eol=lf
+# Models, buffers and textures are bytes; never touch their line endings.
+*.glb binary
+*.bin binary
+*.png binary
+*.jpg binary
+*.webp binary
+*.ktx2 binary
