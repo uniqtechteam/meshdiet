@@ -35,6 +35,8 @@ test:
     - command -v unzip || (apt-get update -qq && apt-get install -y -qq unzip)
     - unzip -o /tmp/gltfpack.zip gltfpack -d /usr/local/bin && chmod +x /usr/local/bin/gltfpack
     - cargo test --workspace
+    # the tests built target/debug/meshdiet; run it on the demo site like the release does
+    - scripts/smoke.sh target/debug/meshdiet /usr/local/bin/gltfpack
 
 # The oldest Rust we promise to build on (rust-version in Cargo.toml).
 msrv:
@@ -42,6 +44,12 @@ msrv:
   before_script: []
   script:
     - cargo check --workspace --locked
+
+# What cargo publish would upload, built on its own: catches missing files and metadata
+# before a release tag does.
+package:
+  script:
+    - cargo publish --workspace --locked --dry-run
 
 deny:
   script:

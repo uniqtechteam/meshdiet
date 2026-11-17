@@ -7,8 +7,11 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
-keywords.workspace = true
-categories.workspace = true
+keywords = ["gltf", "glb", "3d", "performance", "audit"]
+categories = ["development-tools", "graphics", "web-programming"]
+readme = "README.md"
+# The tests read tests/fixtures at the repository root and build files with xtask; both stay in git.
+exclude = ["tests/"]
 
 [dependencies]
 serde.workspace = true

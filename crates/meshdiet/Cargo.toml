@@ -10,6 +10,8 @@ repository.workspace = true
 authors.workspace = true
 keywords.workspace = true
 categories.workspace = true
+# The tests read tests/fixtures at the repository root and build files with xtask; both stay in git.
+exclude = ["tests/"]
 
 [dependencies]
 meshdiet-core.workspace = true

@@ -54,3 +54,39 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: EmbarkStudios/cargo-deny-action@v2
+
+  action:
+    name: action on the demo site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --locked -p meshdiet
+      # the Action from this checkout, on the binary just built instead of a release download
+      - id: meshdiet
+        uses: ./
+        with:
+          binary: target/debug/meshdiet
+          path: tests/fixtures/demo-site
+          fail-on: never
+          sarif: "false"
+          install-gltfpack: "true"
+      - name: check the outputs, then scan and fix the demo site
+        env:
+          HIGH: ${{ steps.meshdiet.outputs.high }}
+          TOTAL: ${{ steps.meshdiet.outputs.total-bytes }}
+          GLTFPACK: ${{ steps.meshdiet.outputs.gltfpack }}
+        run: |
+          echo "high=$HIGH total-bytes=$TOTAL"
+          test "$HIGH" -ge 1
+          test "$TOTAL" -gt 0
+          scripts/smoke.sh target/debug/meshdiet "$GLTFPACK"
+
+  package:
+    name: cargo publish --dry-run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo publish --workspace --locked --dry-run
