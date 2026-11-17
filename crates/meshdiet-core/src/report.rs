@@ -3,13 +3,15 @@
 
 use std::collections::BTreeMap;
 use std::panic::{AssertUnwindSafe, catch_unwind};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
 
 use crate::rule::{self, GLTF_001, Rule};
+use crate::rules::load;
 use crate::rules::size;
+use crate::source_index::SourceIndex;
 use crate::weight::{self, PageTotal, Totals};
 use crate::{Asset, Confidence, Config, Finding, Measured, Severity, asset, walk};
 
@@ -25,6 +27,8 @@ pub struct Options {
     pub progress: Option<fn(&str)>,
     /// Compute the gzip transfer estimate (`--gzip`); reads every byte of every file.
     pub gzip: bool,
+    /// Where the app's JS/TS/HTML sources are, for LOAD-001 (`--src`); the scan root when `None`.
+    pub src: Option<PathBuf>,
 }
 
 /// Counts per severity.
@@ -196,6 +200,10 @@ pub fn scan_with(
         &options.config,
         &config_path,
     ));
+    if assets.iter().any(load::needs_decoder) {
+        let src: &Path = options.src.as_deref().unwrap_or(&walked.root);
+        findings.extend(load::check(&assets, &SourceIndex::build(src)));
+    }
     findings.sort_by(|a, b| {
         b.severity
             .cmp(&a.severity)

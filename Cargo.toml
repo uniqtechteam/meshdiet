@@ -28,6 +28,8 @@ toml = { version = "1", default-features = false, features = ["parse", "serde"] 
 globset = "0.4"
 # `--gzip` transfer estimate (pure Rust backend).
 flate2 = "1"
+# Token search in JS/TS/HTML sources for LOAD-001 (no JS parser).
+memchr = "2"
 xtask = { path = "xtask" }
 # Fixture textures only (xtask); the scanner never decodes images.
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }

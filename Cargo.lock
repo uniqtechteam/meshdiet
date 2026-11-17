@@ -362,6 +362,7 @@ dependencies = [
  "ignore",
  "imagesize",
  "ktx2",
+ "memchr",
  "serde",
  "serde_json",
  "tempfile",

@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use ignore::WalkBuilder;
 
 /// Folders never worth walking, even when a project forgot to ignore them.
-const SKIP_DIRS: &[&str] = &["node_modules", ".git", "target"];
+pub(crate) const SKIP_DIRS: &[&str] = &["node_modules", ".git", "target"];
 
 /// One asset file found by the walk.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]

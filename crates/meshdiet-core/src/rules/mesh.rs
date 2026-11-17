@@ -104,7 +104,7 @@ fn finding(
     clippy::cast_precision_loss,
     reason = "one decimal of a byte count; f64 is exact far beyond any real file"
 )]
-fn size(bytes: u64) -> String {
+pub(super) fn size(bytes: u64) -> String {
     let b = bytes as f64;
     if bytes < 1_000 {
         format!("{bytes} B")
@@ -128,7 +128,7 @@ fn thousands(n: u64) -> String {
     out
 }
 
-fn plural(n: u64, one: &str, many: &str) -> String {
+pub(super) fn plural(n: u64, one: &str, many: &str) -> String {
     format!("{n} {}", if n == 1 { one } else { many })
 }
 

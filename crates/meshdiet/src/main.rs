@@ -45,6 +45,10 @@ struct ScanArgs {
     /// Let medium-confidence findings fail the build too.
     #[arg(long)]
     strict: bool,
+    /// Folder with the app's JS/TS/HTML, searched for decoder setup (LOAD-001) [default: the
+    /// scanned folder].
+    #[arg(long, value_name = "DIR")]
+    src: Option<PathBuf>,
     /// Print only the summary line.
     #[arg(long, short, conflicts_with = "verbose")]
     quiet: bool,
@@ -123,10 +127,16 @@ fn config(args: &ScanArgs) -> Result<Config, String> {
 }
 
 fn scan(args: &ScanArgs) -> Result<ExitCode, String> {
+    if let Some(src) = &args.src
+        && !src.is_dir()
+    {
+        return Err(format!("--src {} is not a folder", src.display()));
+    }
     let options = Options {
         config: config(args)?,
         progress: args.verbose.then_some(progress as fn(&str)),
         gzip: args.gzip,
+        src: args.src.clone(),
     };
     let report = meshdiet_core::scan(&args.paths, &options)?;
     for err in &report.internal_errors {

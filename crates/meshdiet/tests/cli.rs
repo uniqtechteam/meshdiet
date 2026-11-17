@@ -66,6 +66,7 @@ fn help_lists_the_scan_options() {
         "--quiet",
         "--verbose",
         "--strict",
+        "--src",
     ] {
         assert!(stdout(&out).contains(flag), "missing {flag}");
     }
@@ -231,4 +232,48 @@ fn several_paths_are_scanned_together() {
         path(&fixtures().join("TEX-001/bad")),
     ]);
     assert_eq!(report["totals"]["assets"], 2);
+}
+
+#[test]
+fn demo_site_misses_the_meshopt_decoder() {
+    let report = json(&[path(&fixtures().join("demo-site"))]);
+    let load: Vec<&Value> = report["findings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|f| f["rule"] == "LOAD-001")
+        .collect();
+    assert_eq!(load.len(), 1, "{load:#?}");
+    assert_eq!(load[0]["path"], "public/models/chair.glb");
+    assert_eq!(load[0]["confidence"], "medium");
+    assert!(load[0]["message"].as_str().unwrap().contains("meshopt"));
+}
+
+#[test]
+fn src_reads_sources_elsewhere() {
+    let site = fixtures().join("demo-site");
+    let models = site.join("public/models");
+    let rules = |args: &[&str]| -> Vec<String> {
+        json(args)["findings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|f| f["rule"].as_str().unwrap().to_owned())
+            .collect()
+    };
+    assert!(!rules(&[path(&models)]).contains(&"LOAD-001".to_owned()));
+    let with_src = rules(&[path(&models), "--src", path(&site.join("src"))]);
+    assert!(with_src.contains(&"LOAD-001".to_owned()));
+}
+
+#[test]
+fn src_must_be_a_folder() {
+    let o = run(&[
+        "scan",
+        path(&fixtures().join("demo-site")),
+        "--src",
+        "/no/such/src",
+    ]);
+    assert_eq!(o.status.code(), Some(2));
+    assert!(stderr(&o).contains("--src"));
 }

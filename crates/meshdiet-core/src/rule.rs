@@ -2,7 +2,7 @@
 
 use serde::Serialize;
 
-use crate::rules::mesh;
+use crate::rules::{file, load, mesh};
 use crate::{Asset, Confidence, Config, Finding, Severity};
 
 /// What a rule is, for `meshdiet rules`, `meshdiet explain` and SARIF.
@@ -42,13 +42,15 @@ pub const GLTF_001: RuleInfo = RuleInfo {
     summary: "broken GLB container, invalid JSON, a missing referenced file or a bufferView past its buffer",
 };
 
-/// Every rule, in the order they run. The asset rules arrive with TASK-RULE-001…003.
+/// Every per-asset rule, in the order they run. LOAD-001 looks at the whole scan and runs after
+/// them (`report::scan_with`).
 #[must_use]
 pub fn all() -> Vec<Box<dyn Rule>> {
     let mut rules: Vec<Box<dyn Rule>> = vec![
         Box::new(mesh::UncompressedGeometry),
         Box::new(mesh::TriangleBudget),
         Box::new(mesh::UnusedBufferBytes),
+        Box::new(file::EmbeddedData),
     ];
     rules.extend(crate::rules::texture::rules());
     rules.push(Box::new(crate::rules::size::FileOverBudget));
@@ -61,6 +63,7 @@ pub fn catalogue() -> Vec<&'static RuleInfo> {
     let mut list: Vec<&'static RuleInfo> = all().iter().map(|r| r.info()).collect();
     list.push(&GLTF_001);
     list.extend(crate::rules::size::BUILD_RULES);
+    list.push(&load::LOAD_001);
     list.sort_by_key(|i| i.id);
     list
 }
