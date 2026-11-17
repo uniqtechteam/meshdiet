@@ -22,3 +22,8 @@ xtask.workspace = true
 
 [lints]
 workspace = true
+
+# Has its own main: the test binary doubles as a fake gltfpack (see tests/fix.rs).
+[[test]]
+name = "fix"
+harness = false

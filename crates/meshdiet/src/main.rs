@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+mod fix;
 mod output;
 
 use std::io::{IsTerminal, Write};
@@ -23,6 +24,8 @@ struct Cli {
 enum Command {
     /// Read every .glb and .gltf under the given paths and report what makes them heavy.
     Scan(ScanArgs),
+    /// Compress the flagged models with gltfpack, check every output, and report what was saved.
+    Fix(fix::FixArgs),
 }
 
 #[derive(clap::Args)]
@@ -64,6 +67,9 @@ struct ScanArgs {
     /// Show every row of the weight table, not only the 20 largest.
     #[arg(long)]
     all: bool,
+    /// Then run `meshdiet fix` with its defaults on the same paths.
+    #[arg(long)]
+    fix: bool,
 }
 
 /// How the report is written.
@@ -96,11 +102,13 @@ impl From<Threshold> for FailOn {
 
 fn main() -> ExitCode {
     match Cli::parse().command {
-        Command::Scan(args) => scan(&args).unwrap_or_else(|e| {
-            eprintln!("meshdiet: {e}");
-            ExitCode::from(2)
-        }),
+        Command::Scan(args) => scan(&args),
+        Command::Fix(args) => fix::run(&args),
     }
+    .unwrap_or_else(|e| {
+        eprintln!("meshdiet: {e}");
+        ExitCode::from(2)
+    })
 }
 
 fn progress(path: &str) {
@@ -109,12 +117,12 @@ fn progress(path: &str) {
 
 /// `--config`, else `meshdiet.toml` in the one folder given, else in the current folder, else the
 /// defaults.
-fn config(args: &ScanArgs) -> Result<Config, String> {
-    if let Some(file) = &args.config {
+fn config(file: Option<&std::path::Path>, paths: &[PathBuf]) -> Result<Config, String> {
+    if let Some(file) = file {
         return Config::load(file);
     }
     let mut candidates = Vec::new();
-    if let [dir] = args.paths.as_slice()
+    if let [dir] = paths
         && dir.is_dir()
     {
         candidates.push(dir.join("meshdiet.toml"));
@@ -132,8 +140,13 @@ fn scan(args: &ScanArgs) -> Result<ExitCode, String> {
     {
         return Err(format!("--src {} is not a folder", src.display()));
     }
+    if args.fix && matches!(args.format, Format::Json) {
+        return Err(
+            "--fix prints a second report; use `meshdiet fix --format json` for JSON".into(),
+        );
+    }
     let options = Options {
-        config: config(args)?,
+        config: config(args.config.as_deref(), &args.paths)?,
         progress: args.verbose.then_some(progress as fn(&str)),
         gzip: args.gzip,
         src: args.src.clone(),
@@ -166,6 +179,12 @@ fn scan(args: &ScanArgs) -> Result<ExitCode, String> {
         None => std::io::stdout().lock().write_all(text.as_bytes()),
     }
     .map_err(|e| format!("cannot write the report: {e}"))?;
+    if args.fix {
+        println!();
+        let mut defaults = fix::FixArgs::defaults(args.paths.clone());
+        defaults.config.clone_from(&args.config);
+        return fix::run(&defaults);
+    }
     Ok(if report.fails(args.fail_on.into(), args.strict) {
         ExitCode::from(1)
     } else {

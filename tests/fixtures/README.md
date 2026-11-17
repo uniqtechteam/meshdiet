@@ -44,6 +44,10 @@ Tools used on 2026-11-17 (Linux x86_64):
   SHA-256 `0666d9dc40d60fe5b9a45f3fc24f8e6ca87112974bd5de9ca57152aa13d06017`
 - glTF Transform CLI 4.5.1 (`npm install @gltf-transform/cli@4.5.1`)
 
+The `meshdiet fix` tests (`crates/meshdiet/tests/fix.rs`) run this same gltfpack, from
+`MESHDIET_TEST_GLTFPACK` or `PATH`, and print a skip line for each test that needs it when it is not
+installed. CI downloads the zip above and checks its SHA-256 first.
+
 ```bash
 cargo xtask fixture-sources /tmp/meshdiet-src     # chair.glb, dense.glb, two-textures.glb
 cd tests/fixtures
