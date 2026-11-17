@@ -5,6 +5,7 @@
 mod explain;
 mod fix;
 mod output;
+mod sarif;
 
 use std::io::{IsTerminal, Write};
 use std::path::PathBuf;
@@ -108,6 +109,8 @@ enum Format {
     Pretty,
     /// Machine-readable JSON (schema 1).
     Json,
+    /// SARIF 2.1.0, for GitHub code scanning.
+    Sarif,
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -257,6 +260,7 @@ fn scan(args: &ScanArgs) -> Result<ExitCode, String> {
             },
         ),
         Format::Json => output::json(&report),
+        Format::Sarif => sarif::render(&report),
     };
     match &args.output {
         Some(file) => std::fs::write(file, text),
