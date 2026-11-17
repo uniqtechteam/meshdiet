@@ -55,3 +55,8 @@ deny:
   script:
     - cargo install --locked cargo-deny
     - cargo deny check
+
+# The speed goal: 200 models / about 500 MB audited in under 2 s (release build, generated set).
+speed:
+  script:
+    - cargo test --release -p meshdiet-core --test speed -- --ignored --nocapture
