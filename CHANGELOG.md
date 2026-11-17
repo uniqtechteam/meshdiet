@@ -85,6 +85,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   adds gltfpack 1.3, pinned and checksum-checked, so a later step can run `meshdiet fix`.
 - Release builds for Linux (x86_64 and aarch64, static), macOS (Intel and Apple silicon) and Windows,
   with a `SHA256SUMS` file, and `cargo install meshdiet` from crates.io.
+- Documentation: a README with real output from the demo site and a diagram of what happens inside,
+  `docs/config.md` (every key in `meshdiet.toml`), `docs/ci.md` (the Action, exit codes, other CI
+  systems) and `docs/qa.md`, the record of scanning and fixing 12 public projects before the first
+  release. The demo image and the QA chart are drawn from real runs by `scripts/demo_svg.py` and
+  `scripts/qa_chart.py`.
 
 ### Changed
 
