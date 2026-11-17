@@ -244,7 +244,31 @@ fn mesh_003(out: &mut Vec<File>) {
     let mesh = good.grid_mesh("table", 3_000, None);
     good.node("table", mesh, 0.0);
     good.dead_bytes(6 * 1024);
-    add(out, "MESH-003/good", vec![("table.glb".into(), good.glb())]);
+    // 100 KB that only an EXT_structural_metadata property table points at (3D Tiles, CesiumJS)
+    let mut tiles = cube();
+    let values = tiles.raw_view(&vec![0; 100 * 1024]);
+    let offsets = tiles.raw_view(&vec![0; 4 * 1024]);
+    tiles.extension(
+        "EXT_structural_metadata",
+        json!({
+            "schema": { "classes": { "building": { "properties": {
+                "name": { "type": "STRING" }
+            } } } },
+            "propertyTables": [{
+                "class": "building",
+                "count": 1023,
+                "properties": { "name": { "values": values, "stringOffsets": offsets } }
+            }]
+        }),
+    );
+    add(
+        out,
+        "MESH-003/good",
+        vec![
+            ("table.glb".into(), good.glb()),
+            ("tile-metadata.glb".into(), tiles.glb()),
+        ],
+    );
 }
 
 fn tex_001(out: &mut Vec<File>) {
