@@ -1,0 +1,30 @@
+[
+  {
+    "path": "bad-magic.glb",
+    "rule": "GLTF-001"
+  },
+  {
+    "path": "broken.gltf",
+    "rule": "GLTF-001"
+  },
+  {
+    "path": "empty.glb",
+    "rule": "GLTF-001"
+  },
+  {
+    "path": "missing-bin.gltf",
+    "rule": "GLTF-001"
+  },
+  {
+    "path": "overrun-json.glb",
+    "rule": "GLTF-001"
+  },
+  {
+    "path": "truncated.glb",
+    "rule": "GLTF-001"
+  },
+  {
+    "path": "view-past-end.glb",
+    "rule": "GLTF-001"
+  }
+]
