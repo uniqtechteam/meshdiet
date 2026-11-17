@@ -45,6 +45,12 @@ msrv:
   script:
     - cargo check --workspace --locked
 
+# What cargo publish would upload, built on its own: catches missing files and metadata
+# before a release tag does.
+package:
+  script:
+    - cargo publish --workspace --locked --dry-run
+
 deny:
   script:
     - cargo install --locked cargo-deny

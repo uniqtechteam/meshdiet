@@ -82,3 +82,11 @@ jobs:
           test "$HIGH" -ge 1
           test "$TOTAL" -gt 0
           scripts/smoke.sh target/debug/meshdiet "$GLTFPACK"
+
+  package:
+    name: cargo publish --dry-run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo publish --workspace --locked --dry-run

@@ -1,0 +1,285 @@
+name: Release
+
+# Push a tag like v0.1.0 (it must match the workspace version):
+#   1. meshdiet is built for five targets and smoke tested on Linux, macOS and Windows
+#      (scripts/smoke.sh: scan the demo site in every format; on Linux x64 also `meshdiet fix`
+#      with the pinned gltfpack);
+#   2. the archives and a SHA256SUMS file go up as a GitHub release, with notes from CHANGELOG.md,
+#      and the moving major tag (v0) is pointed at the release for `uses: uniqtechteam/meshdiet@v0`;
+#   3. the Action in this repository installs that release on Linux, macOS and Windows and scans
+#      the demo site;
+#   4. meshdiet-core and meshdiet are published to crates.io, in that order.
+# Run it by hand from the Actions tab for a dry run: the same builds and smoke tests, the archives
+# kept as workflow artifacts, the Action run on those archives, `cargo publish --dry-run` instead of
+# an upload, and no release.
+on:
+  push:
+    # full versions only (v0.1.0, v0.2.0-rc.1); the moving v0 tag must not start a release
+    tags: ["v[0-9]+.[0-9]+.[0-9]+*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  version:
+    name: check the version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.read.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: read
+        name: read the workspace version
+        run: |
+          version=$(cargo metadata --no-deps --format-version 1 \
+            | jq -r '.packages[] | select(.name == "meshdiet") | .version')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "workspace version: $version"
+      - name: the tag matches it
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          VERSION: ${{ steps.read.outputs.version }}
+        run: |
+          if [ "$GITHUB_REF_NAME" != "v$VERSION" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match the workspace version $VERSION"
+            exit 1
+          fi
+
+  build:
+    name: build (${{ matrix.target }})
+    needs: version
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # musl: one static binary that runs on any Linux runner, old glibc or Alpine
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-musl, smoke: true, gltfpack: true }
+          - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-musl, smoke: true, gltfpack: false }
+          - { os: macos-latest, target: aarch64-apple-darwin, smoke: true, gltfpack: false }
+          # macos-13 runners are retired: the Intel build cross-compiles on Apple silicon, so the
+          # macOS smoke test runs on the aarch64 binary only
+          - { os: macos-latest, target: x86_64-apple-darwin, smoke: false, gltfpack: false }
+          - { os: windows-latest, target: x86_64-pc-windows-msvc, smoke: true, gltfpack: false }
+    env:
+      ARCHIVE: meshdiet-${{ needs.version.outputs.version }}-${{ matrix.target }}
+      EXE: ${{ startsWith(matrix.os, 'windows') && 'meshdiet.exe' || 'meshdiet' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: musl linker
+        if: contains(matrix.target, 'musl')
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq musl-tools
+      - name: build
+        run: cargo build --release --locked -p meshdiet --target ${{ matrix.target }}
+
+      # the same pinned zip and hash as the Action and .gitlab-ci.yml
+      - name: gltfpack 1.3 for the fix smoke test
+        if: matrix.gltfpack
+        run: |
+          curl -sSfL --retry 3 -o "$RUNNER_TEMP/gltfpack.zip" \
+            https://github.com/zeux/meshoptimizer/releases/download/v1.3/gltfpack-ubuntu.zip
+          echo "0666d9dc40d60fe5b9a45f3fc24f8e6ca87112974bd5de9ca57152aa13d06017  $RUNNER_TEMP/gltfpack.zip" | sha256sum -c -
+          unzip -o -q "$RUNNER_TEMP/gltfpack.zip" gltfpack -d "$RUNNER_TEMP/gltfpack"
+          chmod +x "$RUNNER_TEMP/gltfpack/gltfpack"
+          echo "MESHDIET_GLTFPACK=$RUNNER_TEMP/gltfpack/gltfpack" >> "$GITHUB_ENV"
+
+      - name: smoke test (scan the demo site, fix it where gltfpack is installed)
+        if: matrix.smoke
+        shell: bash
+        run: bash scripts/smoke.sh "target/${{ matrix.target }}/release/$EXE"
+
+      - name: package
+        shell: bash
+        run: |
+          mkdir "$ARCHIVE"
+          cp "target/${{ matrix.target }}/release/$EXE" README.md CHANGELOG.md LICENSE-MIT LICENSE-APACHE "$ARCHIVE"/
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            7z a "$ARCHIVE.zip" "$ARCHIVE" > /dev/null
+            echo "ASSET=$ARCHIVE.zip" >> "$GITHUB_ENV"
+          else
+            tar czf "$ARCHIVE.tar.gz" "$ARCHIVE"
+            echo "ASSET=$ARCHIVE.tar.gz" >> "$GITHUB_ENV"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: ${{ env.ASSET }}
+          if-no-files-found: error
+
+  release:
+    name: GitHub release
+    needs: [version, build]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: checksums
+        run: cd dist && sha256sum -- * > SHA256SUMS && cat SHA256SUMS
+      - name: release notes from CHANGELOG.md
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          # the "## [x.y.z]" section, up to the next "## [" heading
+          awk -v v="$VERSION" '
+            index($0, "## [" v "]") == 1 { on = 1; next }
+            on && /^## \[/ { exit }
+            on { print }
+          ' CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then
+            echo "::warning::CHANGELOG.md has no [$VERSION] section; using generated notes"
+          fi
+      - name: create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          args=(--repo "$GITHUB_REPOSITORY" --title "meshdiet $VERSION" --verify-tag)
+          if [ -s notes.md ]; then args+=(--notes-file notes.md); else args+=(--generate-notes); fi
+          case "$VERSION" in *-*) args+=(--prerelease) ;; esac
+          gh release create "$GITHUB_REF_NAME" dist/* "${args[@]}"
+      - name: move the major tag (v0) used by the Action
+        if: ${{ !contains(needs.version.outputs.version, '-') }}
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          major="v${VERSION%%.*}"
+          git tag -f "$major" "$GITHUB_SHA"
+          git push -f origin "refs/tags/$major"
+
+  action:
+    name: action (${{ matrix.os }})
+    needs: [version, build, release]
+    # after the release on a tag; on a manual run the release is skipped and the Action is given
+    # the archive built above instead of downloading one
+    if: ${{ !failure() && !cancelled() }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-musl }
+          - { os: macos-latest, target: aarch64-apple-darwin }
+          - { os: windows-latest, target: x86_64-pc-windows-msvc }
+    steps:
+      - uses: actions/checkout@v4
+      - name: archive from this run (dry run only)
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: ${{ runner.temp }}/archive
+      - name: unpack it
+        id: local
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        shell: bash
+        env:
+          ARCHIVE: meshdiet-${{ needs.version.outputs.version }}-${{ matrix.target }}
+        run: |
+          cd "$RUNNER_TEMP/archive"
+          if [ "$RUNNER_OS" = Windows ]; then
+            7z x "$ARCHIVE.zip" > /dev/null
+            echo "bin=$RUNNER_TEMP/archive/$ARCHIVE/meshdiet.exe" >> "$GITHUB_OUTPUT"
+          else
+            tar xzf "$ARCHIVE.tar.gz"
+            echo "bin=$RUNNER_TEMP/archive/$ARCHIVE/meshdiet" >> "$GITHUB_OUTPUT"
+          fi
+
+      - id: meshdiet
+        name: the Action reports the demo site
+        uses: ./
+        with:
+          version: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
+          binary: ${{ steps.local.outputs.bin }}
+          path: tests/fixtures/demo-site
+          fail-on: never
+          sarif: "false"
+          install-gltfpack: "true"
+      - name: check what it reported
+        shell: bash
+        env:
+          EXIT_CODE: ${{ steps.meshdiet.outputs.exit-code }}
+          HIGH: ${{ steps.meshdiet.outputs.high }}
+          FILES: ${{ steps.meshdiet.outputs.files }}
+          TOTAL: ${{ steps.meshdiet.outputs.total-bytes }}
+          REPORT: ${{ steps.meshdiet.outputs.report-file }}
+          SARIF: ${{ steps.meshdiet.outputs.sarif-file }}
+        run: |
+          set -euo pipefail
+          echo "exit-code=$EXIT_CODE high=$HIGH files=$FILES total-bytes=$TOTAL"
+          test "$EXIT_CODE" = 0
+          test "$HIGH" -ge 1
+          test "$FILES" -ge 1
+          test "$TOTAL" -gt 0
+          grep -q '^## meshdiet' "$REPORT"
+          grep -q '"version": "2.1.0"' "$SARIF"
+          # install-gltfpack put the pinned, checksum-verified gltfpack on PATH
+          gltfpack -v 2>&1 | grep -q 'gltfpack 1\.3'
+
+      # The demo site has planted high findings, so the same scan must fail the job at high.
+      - id: gate
+        name: the Action fails at fail-on high
+        uses: ./
+        continue-on-error: true
+        with:
+          version: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
+          binary: ${{ steps.local.outputs.bin }}
+          path: tests/fixtures/demo-site
+          fail-on: high
+          sarif: "false"
+          summary: "false"
+      - name: check that it failed
+        shell: bash
+        env:
+          OUTCOME: ${{ steps.gate.outcome }}
+        run: |
+          echo "outcome=$OUTCOME"
+          test "$OUTCOME" = failure
+
+  publish:
+    name: crates.io
+    needs: [version, build, release, action]
+    # after the release on a tag; on a manual run the release is skipped and this is a dry run
+    if: ${{ !failure() && !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: dry run
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        run: cargo publish --workspace --locked --dry-run
+      - name: publish meshdiet-core, then meshdiet
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          if [ -z "$CARGO_REGISTRY_TOKEN" ]; then
+            echo "::error::the CARGO_REGISTRY_TOKEN secret is not set; nothing was published"
+            exit 1
+          fi
+          # dependency order; cargo waits until each crate is in the index before the next one.
+          # A crate already on crates.io at this version (a re-run) is skipped.
+          for crate in meshdiet-core meshdiet; do
+            status=$(curl -s -o /dev/null -w '%{http_code}' \
+              -A "meshdiet-release (https://github.com/uniqtechteam/meshdiet)" \
+              "https://crates.io/api/v1/crates/$crate/$VERSION")
+            if [ "$status" = "200" ]; then
+              echo "$crate $VERSION is already on crates.io, skipping"
+              continue
+            fi
+            cargo publish --locked -p "$crate"
+          done
