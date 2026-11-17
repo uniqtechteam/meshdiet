@@ -24,6 +24,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   quantized). MESH-002: more than 500,000 triangles drawn by the default scene, each node instance
   counted, strips and fans counted right. MESH-003: buffer bytes that no bufferView uses (over 64 KB or
   10% of the buffer); meshopt fallback buffers and views that only an extension names are not counted.
+- Texture checks. TEX-001: an image wider or taller than 2048 px, with its estimated GPU memory now
+  and at the limit. TEX-002: PNG, JPEG, WebP or AVIF textures that take more than an estimated 32 MB
+  of GPU memory in one model, where KTX2 would take about a quarter. TEX-003: a PNG over 256 KB whose
+  header says it cannot be transparent, so JPEG or WebP would be far smaller (normal maps are only
+  pointed to WebP). TEX-004: an image over 1 MB. A `KHR_texture_basisu` texture counts as KTX2 even
+  with a PNG fallback. Each image in the JSON report now says what its PNG header declares about
+  transparency (`alpha`).
 - Readable output grouped by file with a summary line, or `--format json` (schema 1) for scripts;
   `--output FILE`, `--quiet`, `--verbose`, and no colour when piped or when `NO_COLOR` is set.
 - Exit codes for CI: 0 when nothing reaches `--fail-on` (high by default), 1 when something does, 2 for
