@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1090" viewBox="0 0 1000 1090" role="img" aria-label="meshdiet scanning a demo site, fixing three models with gltfpack, and scanning the fixed copy">
+<style>
+  text { animation: show 0.01s steps(1) backwards; }
+  @keyframes show { from { opacity: 0; } to { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { text { animation: none; } }
+</style>
+<rect width="1000" height="1090" rx="10" fill="#0d1117"/>
+<circle cx="22" cy="20" r="6" fill="#ff5f57"/><circle cx="42" cy="20" r="6" fill="#febc2e"/><circle cx="62" cy="20" r="6" fill="#28c840"/>
+<g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12.5">
+<text x="20" y="58" xml:space="preserve" style="animation-delay:0.40s"><tspan fill="#3fb950">$</tspan><tspan fill="#e6edf3" font-weight="700"> meshdiet scan demo-site</tspan></text>
+<text x="20" y="77" xml:space="preserve" style="animation-delay:1.30s"><tspan fill="#e6edf3" font-weight="700">public/models/hero.glb  5.1 MB</tspan></text>
+<text x="20" y="96" xml:space="preserve" style="animation-delay:1.34s"><tspan fill="#f0883e" font-weight="700">  high    </tspan><tspan fill="#e6edf3" font-weight="700">MESH-001  </tspan><tspan fill="#c9d1d9">1 primitive, 1.3 MB of uncompressed geometry</tspan></text>
+<text x="20" y="115" xml:space="preserve" style="animation-delay:1.38s"><tspan fill="#8b949e">          Fix: Run `meshdiet fix` on this file (gltfpack, meshopt), or `gltf-transform draco in.glb out.glb` if</tspan></text>
+<text x="20" y="134" xml:space="preserve" style="animation-delay:1.38s"><tspan fill="#c9d1d9">               you need Draco; then make sure the app loads the decoder (LOAD-001).</tspan></text>
+<text x="20" y="153" xml:space="preserve" style="animation-delay:1.42s"><tspan fill="#f0883e" font-weight="700">  high    </tspan><tspan fill="#e6edf3" font-weight="700">SIZE-001  </tspan><tspan fill="#c9d1d9">5.1 MB, over the 5.0 MB file budget: geometry 1.3 MB, textures 3.8 MB, other 1.2 KB. Biggest</tspan></text>
+<text x="20" y="172" xml:space="preserve" style="animation-delay:1.42s"><tspan fill="#c9d1d9">                  image: hero-photo (1400x1400 JPEG, 3.8 MB)</tspan></text>
+<text x="20" y="191" xml:space="preserve" style="animation-delay:1.46s"><tspan fill="#c9d1d9"></tspan></text>
+<text x="20" y="210" xml:space="preserve" style="animation-delay:1.50s"><tspan fill="#e6edf3" font-weight="700">public/models/chair.glb  19.0 KB</tspan></text>
+<text x="20" y="229" xml:space="preserve" style="animation-delay:1.54s"><tspan fill="#d29922" font-weight="700">  medium  </tspan><tspan fill="#e6edf3" font-weight="700">LOAD-001  </tspan><tspan fill="#c9d1d9">1 meshopt-compressed model, but none of the 2 source files mention MeshoptDecoder:</tspan></text>
+<text x="20" y="248" xml:space="preserve" style="animation-delay:1.54s"><tspan fill="#c9d1d9">                  public/models/chair.glb  (check by hand)</tspan></text>
+<text x="20" y="267" xml:space="preserve" style="animation-delay:1.58s"><tspan fill="#c9d1d9"></tspan></text>
+<text x="20" y="286" xml:space="preserve" style="animation-delay:1.62s"><tspan fill="#e6edf3" font-weight="700">public/models/hero.glb  5.1 MB</tspan></text>
+<text x="20" y="305" xml:space="preserve" style="animation-delay:1.66s"><tspan fill="#d29922" font-weight="700">  medium  </tspan><tspan fill="#e6edf3" font-weight="700">TEX-004  </tspan><tspan fill="#c9d1d9">hero-photo: 3.8 MB 1400×1400 JPEG, over the 1.0 MB limit</tspan></text>
+<text x="20" y="324" xml:space="preserve" style="animation-delay:1.70s"><tspan fill="#c9d1d9"></tspan></text>
+<text x="20" y="343" xml:space="preserve" style="animation-delay:1.74s"><tspan fill="#e6edf3" font-weight="700">public/models/lamp.gltf  307.4 KB</tspan></text>
+<text x="20" y="362" xml:space="preserve" style="animation-delay:1.78s"><tspan fill="#d29922" font-weight="700">  medium  </tspan><tspan fill="#e6edf3" font-weight="700">TEX-003  </tspan><tspan fill="#c9d1d9">lamp-shade: 270.4 KB PNG with no alpha channel</tspan></text>
+<text x="20" y="381" xml:space="preserve" style="animation-delay:1.82s"><tspan fill="#c9d1d9"></tspan></text>
+<text x="20" y="400" xml:space="preserve" style="animation-delay:1.86s"><tspan fill="#e6edf3" font-weight="700">public/models/sofa.glb  106.7 KB</tspan></text>
+<text x="20" y="419" xml:space="preserve" style="animation-delay:1.90s"><tspan fill="#d29922" font-weight="700">  medium  </tspan><tspan fill="#e6edf3" font-weight="700">TEX-001  </tspan><tspan fill="#c9d1d9">sofa-fabric: 4096×4096 PNG, over the 2048 px limit; est. 89.5 MB GPU memory, est. 22.4 MB at</tspan></text>
+<text x="20" y="438" xml:space="preserve" style="animation-delay:1.90s"><tspan fill="#c9d1d9">                  2048×2048</tspan></text>
+<text x="20" y="457" xml:space="preserve" style="animation-delay:1.94s"><tspan fill="#79c0ff" font-weight="700">  low     </tspan><tspan fill="#e6edf3" font-weight="700">TEX-002  </tspan><tspan fill="#c9d1d9">1 PNG texture takes est. 89.5 MB of GPU memory, over 32.0 MB; as KTX2 about est. 22.4 MB</tspan></text>
+<text x="20" y="476" xml:space="preserve" style="animation-delay:1.98s"><tspan fill="#c9d1d9"></tspan></text>
+<text x="20" y="495" xml:space="preserve" style="animation-delay:2.02s"><tspan fill="#e6edf3" font-weight="700">Weight, largest first</tspan></text>
+<text x="20" y="514" xml:space="preserve" style="animation-delay:2.06s"><tspan fill="#8b949e">  file                        total  geometry  textures  compression  GPU (est.)</tspan></text>
+<text x="20" y="533" xml:space="preserve" style="animation-delay:2.10s"><tspan fill="#c9d1d9">  public/models/hero.glb     5.1 MB    1.3 MB    3.8 MB  none            10.5 MB</tspan></text>
+<text x="20" y="552" xml:space="preserve" style="animation-delay:2.14s"><tspan fill="#c9d1d9">  public/models/lamp.gltf  307.4 KB   35.0 KB  270.4 KB  none           480.0 KB</tspan></text>
+<text x="20" y="571" xml:space="preserve" style="animation-delay:2.18s"><tspan fill="#c9d1d9">  public/models/sofa.glb   106.7 KB   46.8 KB   58.7 KB  none            89.5 MB</tspan></text>
+<text x="20" y="590" xml:space="preserve" style="animation-delay:2.22s"><tspan fill="#c9d1d9">  public/models/chair.glb   19.0 KB   14.8 KB    1.6 KB  meshopt        349.5 KB</tspan></text>
+<text x="20" y="609" xml:space="preserve" style="animation-delay:2.26s"><tspan fill="#c9d1d9"></tspan></text>
+<text x="20" y="628" xml:space="preserve" style="animation-delay:2.30s"><tspan fill="#e6edf3" font-weight="700">4 files · 5.6 MB · 1 uncompressed (5.1 MB) · 2 high · 4 medium · 1 low · scanned in 0.00s</tspan></text>
+<text x="20" y="647" xml:space="preserve" style="animation-delay:3.54s"><tspan fill="#c9d1d9"></tspan></text>
+<text x="20" y="666" xml:space="preserve" style="animation-delay:3.54s"><tspan fill="#3fb950">$</tspan><tspan fill="#e6edf3" font-weight="700"> meshdiet fix demo-site --out demo-site-fixed</tspan></text>
+<text x="20" y="685" xml:space="preserve" style="animation-delay:4.44s"><tspan fill="#8b949e">gltfpack 1.3 (~/.local/bin/gltfpack) with -kn -km -ke -cc -tw -tl 2048</tspan></text>
+<text x="20" y="704" xml:space="preserve" style="animation-delay:4.62s"><tspan fill="#c9d1d9"></tspan></text>
+<text x="20" y="723" xml:space="preserve" style="animation-delay:4.80s"><tspan fill="#e6edf3" font-weight="700">public/models/chair.glb  19.0 KB  skipped</tspan></text>
+<text x="20" y="742" xml:space="preserve" style="animation-delay:4.98s"><tspan fill="#8b949e">    no MESH-001 or TEX finding; --all compresses it anyway</tspan></text>
+<text x="20" y="761" xml:space="preserve" style="animation-delay:5.16s"><tspan fill="#e6edf3" font-weight="700">public/models/hero.glb   5.1 MB → 1.6 MB  −70%  fixed</tspan></text>
+<text x="20" y="780" xml:space="preserve" style="animation-delay:5.34s"><tspan fill="#e6edf3" font-weight="700">public/models/lamp.gltf  307.4 KB → 72.5 KB  −76%  fixed</tspan></text>
+<text x="20" y="799" xml:space="preserve" style="animation-delay:5.52s"><tspan fill="#8b949e">    note: written as public/models/lamp.glb (one file); change the path your code loads, or pass --keep-gltf</tspan></text>
+<text x="20" y="818" xml:space="preserve" style="animation-delay:5.70s"><tspan fill="#e6edf3" font-weight="700">public/models/sofa.glb   106.7 KB → 17.8 KB  −83%  fixed</tspan></text>
+<text x="20" y="837" xml:space="preserve" style="animation-delay:5.88s"><tspan fill="#c9d1d9"></tspan></text>
+<text x="20" y="856" xml:space="preserve" style="animation-delay:6.06s"><tspan fill="#e6edf3" font-weight="700">4 files · 5.6 MB → 1.7 MB (−70%) · 3 fixed, measured on disk</tspan></text>
+<text x="20" y="875" xml:space="preserve" style="animation-delay:6.24s"><tspan fill="#c9d1d9">Written to demo-site-fixed/ (models not fixed are copied as they are).</tspan></text>
+<text x="20" y="894" xml:space="preserve" style="animation-delay:6.42s"><tspan fill="#c9d1d9"></tspan></text>
+<text x="20" y="913" xml:space="preserve" style="animation-delay:6.60s"><tspan fill="#c9d1d9">The fixed models use meshopt compression; tell three.js how to read them:</tspan></text>
+<text x="20" y="932" xml:space="preserve" style="animation-delay:6.78s"><tspan fill="#c9d1d9"></tspan></text>
+<text x="20" y="951" xml:space="preserve" style="animation-delay:6.96s"><tspan fill="#a5d6ff">  import { MeshoptDecoder } from &#x27;three/examples/jsm/libs/meshopt_decoder.module.js&#x27;;</tspan></text>
+<text x="20" y="970" xml:space="preserve" style="animation-delay:7.14s"><tspan fill="#a5d6ff">  loader.setMeshoptDecoder(MeshoptDecoder);</tspan></text>
+<text x="20" y="989" xml:space="preserve" style="animation-delay:7.32s"><tspan fill="#c9d1d9"></tspan></text>
+<text x="20" y="1008" xml:space="preserve" style="animation-delay:7.50s"><tspan fill="#c9d1d9">Then run `meshdiet scan demo-site-fixed` again (LOAD-001 checks the decoder wiring).</tspan></text>
+<text x="20" y="1027" xml:space="preserve" style="animation-delay:8.88s"><tspan fill="#c9d1d9"></tspan></text>
+<text x="20" y="1046" xml:space="preserve" style="animation-delay:8.88s"><tspan fill="#3fb950">$</tspan><tspan fill="#e6edf3" font-weight="700"> meshdiet scan demo-site-fixed --quiet</tspan></text>
+<text x="20" y="1065" xml:space="preserve" style="animation-delay:9.78s"><tspan fill="#e6edf3" font-weight="700">4 files · 1.7 MB · 0 high · 1 medium · 0 low · scanned in 0.00s</tspan></text>
+</g>
+</svg>
