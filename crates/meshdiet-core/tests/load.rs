@@ -175,6 +175,32 @@ fn src_points_at_sources_outside_the_scanned_folder() {
 }
 
 #[test]
+fn scanning_public_reads_the_project_sources() {
+    // the usual layout: models in public/, app code in src/, package.json at the top
+    let dir = project(&[MESHOPT], &[("main.js", THREE)]);
+    fs::rename(dir.path().join("models"), dir.path().join("public")).unwrap();
+    fs::write(dir.path().join("package.json"), "{}").unwrap();
+    let found = load_001(&dir.path().join("public"));
+    assert_eq!(found.len(), 1, "{found:#?}");
+    assert_eq!(found[0].path, "chair.glb");
+
+    let wired = format!("{THREE}loader.setMeshoptDecoder(MeshoptDecoder);\n");
+    fs::write(dir.path().join("src/main.js"), wired).unwrap();
+    assert_eq!(load_001(&dir.path().join("public")), []);
+
+    // no climbing out of the git repository the scan is in
+    fs::create_dir_all(dir.path().join("site/.git")).unwrap();
+    fs::create_dir_all(dir.path().join("site/public")).unwrap();
+    fs::copy(
+        fixtures().join(MESHOPT),
+        dir.path().join("site/public/chair.glb"),
+    )
+    .unwrap();
+    fs::write(dir.path().join("src/main.js"), THREE).unwrap();
+    assert_eq!(load_001(&dir.path().join("site/public")), []);
+}
+
+#[test]
 fn up_to_five_assets_are_named() {
     let dir = project(&[], &[("main.js", THREE)]);
     for i in 0..7 {

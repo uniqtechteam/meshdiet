@@ -128,6 +128,25 @@ impl SourceIndex {
         index
     }
 
+    /// The sources LOAD-001 reads for a scan of `root`: `src` when given. Otherwise the scan root;
+    /// when that has no three.js loader (a scan of `public/` or `static/`, which hold no app code),
+    /// the nearest folder above it with a `package.json` instead, without leaving the git
+    /// repository.
+    #[must_use]
+    pub fn for_scan(root: &Path, src: Option<&Path>) -> Self {
+        if let Some(src) = src {
+            return Self::build(src);
+        }
+        let here = Self::build(root);
+        if here.loader {
+            return here;
+        }
+        match project_root(root) {
+            Some(project) => Self::build(&project),
+            None => here,
+        }
+    }
+
     /// Add one source file's text.
     pub fn add(&mut self, text: &[u8]) {
         let has = |tokens: &[&str]| {
@@ -158,6 +177,24 @@ impl SourceIndex {
     pub fn applies(&self) -> bool {
         self.files > 0 && self.loader && !self.babylon
     }
+}
+
+/// The nearest folder strictly above `dir` that has a `package.json`, stopping at the folder that
+/// holds `.git`.
+fn project_root(dir: &Path) -> Option<std::path::PathBuf> {
+    let dir = dir.canonicalize().ok()?;
+    if dir.join(".git").exists() {
+        return None;
+    }
+    for parent in dir.ancestors().skip(1) {
+        if parent.join("package.json").is_file() {
+            return Some(parent.to_path_buf());
+        }
+        if parent.join(".git").exists() {
+            return None;
+        }
+    }
+    None
 }
 
 #[cfg(test)]

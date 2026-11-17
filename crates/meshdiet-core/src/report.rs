@@ -3,7 +3,7 @@
 
 use std::collections::BTreeMap;
 use std::panic::{AssertUnwindSafe, catch_unwind};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
@@ -29,7 +29,8 @@ pub struct Options {
     pub progress: Option<fn(&str)>,
     /// Compute the gzip transfer estimate (`--gzip`); reads every byte of every file.
     pub gzip: bool,
-    /// Where the app's JS/TS/HTML sources are, for LOAD-001 (`--src`); the scan root when `None`.
+    /// Where the app's JS/TS/HTML sources are, for LOAD-001 (`--src`). When `None`, the scan root,
+    /// or the project folder above it ([`SourceIndex::for_scan`]).
     pub src: Option<PathBuf>,
     /// Run only these rules (`--rules`); every rule when empty. CFG findings always run.
     pub only: Vec<String>,
@@ -276,8 +277,8 @@ pub fn scan_with(
         &config_path,
     ));
     if options.runs(load::LOAD_001.id) && assets.iter().any(load::needs_decoder) {
-        let src: &Path = options.src.as_deref().unwrap_or(&walked.root);
-        findings.extend(load::check(&assets, &SourceIndex::build(src)));
+        let sources = SourceIndex::for_scan(&walked.root, options.src.as_deref());
+        findings.extend(load::check(&assets, &sources));
     }
     findings.extend(no_reason(&options.config, &config_path));
     findings.retain(|f| options.runs(&f.rule));
