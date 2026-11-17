@@ -88,6 +88,8 @@ pub struct Material {
     pub name: Option<String>,
     /// The normal map, if any.
     pub normal_texture: Option<TextureRef>,
+    /// Application data, kept as written.
+    pub extras: Option<Value>,
 }
 
 /// A reference from a material to a texture.
@@ -116,6 +118,8 @@ pub struct Node {
     pub mesh: Option<usize>,
     /// Child nodes.
     pub children: Vec<usize>,
+    /// Application data, kept as written.
+    pub extras: Option<Value>,
 }
 
 /// A mesh.
