@@ -79,6 +79,45 @@ fn ac_002_meshopt_or_draco_is_not_mesh_001() {
 }
 
 #[test]
+fn an_original_next_to_its_compressed_copy_is_skipped_unless_the_app_names_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let models = dir.path().join("public/models");
+    fs::create_dir_all(&models).unwrap();
+    fs::create_dir_all(dir.path().join("src")).unwrap();
+    fs::write(dir.path().join("package.json"), "{}").unwrap();
+    let good = fixtures().join("MESH-001/good");
+    fs::copy(good.join("dense.glb"), models.join("dense.glb")).unwrap();
+    fs::copy(
+        good.join("dense-meshopt.glb"),
+        models.join("dense-compressed.glb"),
+    )
+    .unwrap();
+    let app = "import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';\n\
+               loader.setMeshoptDecoder(MeshoptDecoder);\n";
+    let main = dir.path().join("src/main.js");
+    fs::write(
+        &main,
+        format!("{app}loader.load(`models/dense${{suffix}}.glb`);\n"),
+    )
+    .unwrap();
+    let public = dir.path().join("public");
+    assert_eq!(findings(&public, "MESH-001"), []);
+    let report = scan(std::slice::from_ref(&public), &Options::default()).unwrap();
+    let original = report.assets.iter().find(|a| a.path == "models/dense.glb");
+    assert_eq!(
+        original.unwrap().compressed_copy.as_deref(),
+        Some("models/dense-compressed.glb")
+    );
+    assert_eq!(report.totals.assets, 2, "the original still ships");
+
+    // an easter egg that loads the original by name: the finding stays
+    fs::write(&main, format!("{app}loader.load('models/dense.glb');\n")).unwrap();
+    let found = findings(&public, "MESH-001");
+    assert_eq!(found.len(), 1, "{found:#?}");
+    assert_eq!(found[0].path, "models/dense.glb");
+}
+
+#[test]
 fn small_geometry_is_not_worth_compressing() {
     let small = fixtures().join("MESH-001/good/box.glb");
     assert_eq!(findings(&small, "MESH-001"), []);

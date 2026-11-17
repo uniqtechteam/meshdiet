@@ -85,3 +85,26 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   adds gltfpack 1.3, pinned and checksum-checked, so a later step can run `meshdiet fix`.
 - Release builds for Linux (x86_64 and aarch64, static), macOS (Intel and Apple silicon) and Windows,
   with a `SHA256SUMS` file, and `cargo install meshdiet` from crates.io.
+
+### Changed
+
+These come from scanning 12 public projects that ship glTF models.
+
+- A model that ships next to its own compressed copy (`chair.glb` with `chair-compressed.glb`,
+  `chair.draco.glb`, gltfjsx's `chair-transformed.glb`, ...) is treated as the source of that copy:
+  it still counts in the weight, marked `(source of ...)` in the table and with `compressed_copy` in
+  JSON, but per-file rules skip it and `fix` leaves it alone. If the app's code names the original
+  file itself, nothing is skipped.
+- LOAD-001 reads the project around the scanned folder when that folder has no app code in it, so
+  `meshdiet scan public` checks the decoders in `src/` without `--src`: the nearest folder above with a
+  `package.json`, inside the same git repository.
+- TEX-003 also flags palette PNGs with no `tRNS` chunk, which cannot be transparent either.
+
+### Fixed
+
+- MESH-003 no longer reports the property tables of `EXT_structural_metadata` (3D Tiles, CesiumJS) as
+  unused bytes; they point at their bufferViews through `values`, `arrayOffsets` and `stringOffsets`.
+- `fix` keeps the original when gltfpack drops an extension the input used (such as
+  `EXT_structural_metadata` or `EXT_mesh_manifold`) or a custom `_NAME` vertex attribute; before, the
+  output passed its checks with that data gone. A node or material named `""` no longer counts as
+  named, so files with empty names are not kept back for nothing.

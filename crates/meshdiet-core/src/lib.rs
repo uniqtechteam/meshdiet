@@ -17,6 +17,7 @@ mod report;
 pub mod rule;
 pub mod rules;
 pub mod source_index;
+pub mod variants;
 pub mod walk;
 pub mod weight;
 

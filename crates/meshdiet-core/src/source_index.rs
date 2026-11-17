@@ -3,6 +3,7 @@
 //! Built once per scan by plain token search (no JS parser): a token in a comment counts too, which
 //! can only hide a finding, never invent one.
 
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
 
@@ -86,6 +87,10 @@ pub struct SourceIndex {
     /// Babylon.js is used.
     pub babylon: bool,
     wired: [bool; 3],
+    /// Model file names to look for (`chair.glb`).
+    looking_for: Vec<String>,
+    /// Those of them some source mentions.
+    mentioned: BTreeSet<String>,
 }
 
 impl SourceIndex {
@@ -93,7 +98,13 @@ impl SourceIndex {
     /// `.gitignore` respected, `node_modules`, `.git` and `target` skipped, no symlinks followed.
     #[must_use]
     pub fn build(root: &Path) -> Self {
-        let mut index = Self::default();
+        Self::build_looking_for(root, &[])
+    }
+
+    /// [`SourceIndex::build`], also noting which of the model file `names` the sources mention.
+    #[must_use]
+    pub fn build_looking_for(root: &Path, names: &[String]) -> Self {
+        let mut index = Self::looking_for(names);
         let walker = WalkBuilder::new(root)
             .hidden(false)
             .parents(false)
@@ -128,6 +139,42 @@ impl SourceIndex {
         index
     }
 
+    /// The sources LOAD-001 reads for a scan of `root`: `src` when given. Otherwise the scan root;
+    /// when that has no three.js loader (a scan of `public/` or `static/`, which hold no app code),
+    /// the nearest folder above it with a `package.json` instead, without leaving the git
+    /// repository.
+    /// `names` are model file names to look for, as in [`SourceIndex::build_looking_for`].
+    #[must_use]
+    pub fn for_scan(root: &Path, src: Option<&Path>, names: &[String]) -> Self {
+        if let Some(src) = src {
+            return Self::build_looking_for(src, names);
+        }
+        let here = Self::build_looking_for(root, names);
+        if here.loader {
+            return here;
+        }
+        match project_root(root) {
+            Some(project) => Self::build_looking_for(&project, names),
+            None => here,
+        }
+    }
+
+    /// An empty index that will note mentions of the model file `names`.
+    #[must_use]
+    pub fn looking_for(names: &[String]) -> Self {
+        Self {
+            looking_for: names.to_vec(),
+            ..Self::default()
+        }
+    }
+
+    /// Whether some source mentions the model file `name` (`'models/chair.glb'` mentions
+    /// `chair.glb`; `armchair.glb` does not).
+    #[must_use]
+    pub fn mentions(&self, name: &str) -> bool {
+        self.mentioned.contains(name)
+    }
+
     /// Add one source file's text.
     pub fn add(&mut self, text: &[u8]) {
         let has = |tokens: &[&str]| {
@@ -140,6 +187,11 @@ impl SourceIndex {
         self.babylon |= has(BABYLON_TOKENS);
         for (slot, decoder) in self.wired.iter_mut().zip(Decoder::ALL) {
             *slot |= has(decoder.tokens());
+        }
+        for name in &self.looking_for {
+            if !self.mentioned.contains(name) && mentions_file(text, name) {
+                self.mentioned.insert(name.clone());
+            }
         }
     }
 
@@ -158,6 +210,34 @@ impl SourceIndex {
     pub fn applies(&self) -> bool {
         self.files > 0 && self.loader && !self.babylon
     }
+}
+
+/// `name` appears in `text` as a whole file name: not preceded by a letter, digit, `-` or `_`.
+fn mentions_file(text: &[u8], name: &str) -> bool {
+    memmem::find_iter(text, name.as_bytes()).any(|at| {
+        at == 0
+            || !text
+                .get(at - 1)
+                .is_some_and(|c| c.is_ascii_alphanumeric() || matches!(c, b'-' | b'_'))
+    })
+}
+
+/// The nearest folder strictly above `dir` that has a `package.json`, stopping at the folder that
+/// holds `.git`.
+fn project_root(dir: &Path) -> Option<std::path::PathBuf> {
+    let dir = dir.canonicalize().ok()?;
+    if dir.join(".git").exists() {
+        return None;
+    }
+    for parent in dir.ancestors().skip(1) {
+        if parent.join("package.json").is_file() {
+            return Some(parent.to_path_buf());
+        }
+        if parent.join(".git").exists() {
+            return None;
+        }
+    }
+    None
 }
 
 #[cfg(test)]
@@ -196,6 +276,16 @@ mod tests {
         ]);
         assert!(i.wires(Decoder::Ktx2));
         assert!(!i.wires(Decoder::Meshopt));
+    }
+
+    #[test]
+    fn model_file_names_are_matched_whole() {
+        let mut i = SourceIndex::looking_for(&["chair.glb".into(), "lamp.glb".into()]);
+        i.add(b"load('models/armchair.glb'); load('lamp.glb.bak');");
+        assert!(!i.mentions("chair.glb"));
+        assert!(i.mentions("lamp.glb"));
+        i.add(b"const files = ['vehicle/chair.glb'];");
+        assert!(i.mentions("chair.glb"));
     }
 
     #[test]

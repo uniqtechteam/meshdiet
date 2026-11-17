@@ -32,6 +32,10 @@ build_max = "20 MB"   # SIZE-002, off unless set
 Sizes are decimal (1 MB = 1,000,000 bytes). `--gzip` adds a gzip -6 transfer estimate per file; your
 server may use brotli or nothing, so treat it as a rough guide.
 
+If your build keeps each source model next to the compressed copy the app loads (`chair.glb` and
+`chair-compressed.glb`, or gltfjsx's `chair-transformed.glb`), the source still counts in the weight
+but its own findings are left out, unless your code loads it by name.
+
 The same file sets the gate, what to scan and what to leave out. Unknown keys and rule ids are an
 error, so a typo never switches a check off quietly:
 
@@ -132,7 +136,9 @@ meshdiet command itself never downloads gltfpack; only the Action does, at a pin
 A model compressed with Draco, meshopt or KTX2 only loads when the app sets up the matching decoder
 in three.js. meshdiet searches the JS, TS and HTML in the scanned folder for that setup (`DRACOLoader`,
 `MeshoptDecoder`, `KTX2Loader`, drei `useGLTF`, `<model-viewer>`) and reports LOAD-001 when it is
-missing. If you scan only `public/`, point it at your code with `--src src`. It is a text search, so
+missing. When you scan a folder with no app code in it, such as `public/`, it reads the project around
+it instead (the nearest folder above with a `package.json`, inside the same git repository); `--src`
+points it somewhere else. It is a text search, so
 it is marked "check by hand" and fails a build only with `--strict`; Babylon.js apps are skipped.
 
 ### Fixing what it finds

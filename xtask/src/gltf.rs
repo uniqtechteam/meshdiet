@@ -32,6 +32,7 @@ pub struct Builder {
     textures: Vec<Value>,
     images: Vec<Value>,
     files: Vec<(String, Vec<u8>)>,
+    extensions: serde_json::Map<String, Value>,
 }
 
 /// One written file: a path relative to where the asset goes, and its bytes.
@@ -149,6 +150,17 @@ impl Builder {
         self.bin.resize(self.bin.len() + n, 0);
     }
 
+    /// Append `bytes` behind a bufferView that no accessor or image uses; returns the view index.
+    /// For data that extensions point at, such as `EXT_structural_metadata` property tables.
+    pub fn raw_view(&mut self, bytes: &[u8]) -> usize {
+        self.view(bytes, None)
+    }
+
+    /// Add a root-level extension and list it in `extensionsUsed`.
+    pub fn extension(&mut self, name: &str, value: Value) {
+        self.extensions.insert(name.to_owned(), value);
+    }
+
     /// Change a bufferView after the fact, to plant broken references.
     pub fn patch_view(&mut self, index: usize, key: &str, value: Value) {
         if let Some(view) = self.buffer_views.get_mut(index) {
@@ -175,6 +187,10 @@ impl Builder {
             if !list.is_empty() {
                 doc[key] = json!(list);
             }
+        }
+        if !self.extensions.is_empty() {
+            doc["extensionsUsed"] = json!(self.extensions.keys().collect::<Vec<_>>());
+            doc["extensions"] = Value::Object(self.extensions.clone());
         }
         doc
     }

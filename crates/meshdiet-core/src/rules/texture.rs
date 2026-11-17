@@ -39,7 +39,7 @@ pub const TEX_003: RuleInfo = RuleInfo {
     title: "PNG with no alpha channel",
     severity: Severity::Medium,
     confidence: Confidence::High,
-    summary: "a greyscale or RGB PNG over 256 KB that cannot be transparent, so JPEG or WebP would be far smaller",
+    summary: "a greyscale, RGB or palette PNG over 256 KB that cannot be transparent, so JPEG or WebP would be far smaller",
 };
 
 /// TEX-004.
@@ -301,13 +301,20 @@ impl Rule for PngNoAlpha {
             .iter()
             .filter(|i| !skip.contains(&i.index))
             .filter(|i| i.mime.as_deref() == Some("image/png"))
-            .filter(|i| i.alpha == Some(PngAlpha::None) && i.bytes > PNG_MIN)
+            .filter(|i| {
+                matches!(i.alpha, Some(PngAlpha::None | PngAlpha::Palette)) && i.bytes > PNG_MIN
+            })
             .map(|image| {
                 let normal = normals.contains(&image.index);
                 let message = format!(
-                    "{}: {} PNG{} with no alpha channel",
+                    "{}: {} {}PNG{} with no alpha channel",
                     label(image),
                     size(image.bytes),
+                    if image.alpha == Some(PngAlpha::Palette) {
+                        "palette "
+                    } else {
+                        ""
+                    },
                     if normal { " normal map" } else { "" }
                 );
                 let (why, fix) = if normal {
@@ -416,6 +423,7 @@ mod tests {
             primitives: 0,
             compression: Compression::default(),
             images,
+            compressed_copy: None,
             problems: Vec::new(),
             file_bytes: Vec::new(),
             document: Document::parse(json.as_bytes()).ok(),
@@ -501,12 +509,13 @@ mod tests {
         );
         small.bytes += 1;
         assert_eq!(run(&PngNoAlpha, &asset(doc, vec![small.clone()])).len(), 1);
-        for alpha in [
-            Some(PngAlpha::Channel),
-            Some(PngAlpha::Trns),
-            Some(PngAlpha::Palette),
-            None,
-        ] {
+        // an indexed PNG with no tRNS cannot be transparent either (QA-001: 2048² anisotropy and
+        // metal/roughness maps of 0.6 to 2.8 MB)
+        small.alpha = Some(PngAlpha::Palette);
+        let found = run(&PngNoAlpha, &asset(doc, vec![small.clone()]));
+        assert_eq!(found.len(), 1);
+        assert!(found[0].message.contains("palette PNG with no alpha"));
+        for alpha in [Some(PngAlpha::Channel), Some(PngAlpha::Trns), None] {
             small.alpha = alpha;
             assert_eq!(
                 run(&PngNoAlpha, &asset(doc, vec![small.clone()])),

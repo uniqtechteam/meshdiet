@@ -61,7 +61,7 @@ struct ScanArgs {
     #[arg(long)]
     strict: bool,
     /// Folder with the app's JS/TS/HTML, searched for decoder setup (LOAD-001) [default: the
-    /// scanned folder].
+    /// scanned folder, or the nearest folder above it with a package.json when it has no app code].
     #[arg(long, value_name = "DIR")]
     src: Option<PathBuf>,
     /// Print only the summary line.

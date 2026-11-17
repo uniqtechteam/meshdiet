@@ -209,8 +209,16 @@ fn mesh_001(out: &mut Vec<File>) {
         vec![("dense.glb".into(), dense().glb())],
     );
     expected(out, "MESH-001/bad", "MESH-001", &["dense.glb"]);
-    // dense-meshopt.glb and dense-draco.glb are made by tools (README)
-    add(out, "MESH-001/good", vec![("box.glb".into(), cube().glb())]);
+    // dense-meshopt.glb and dense-draco.glb are made by tools (README); dense.glb is their
+    // uncompressed source, shipped next to them as build scripts do, so the app loads a copy
+    add(
+        out,
+        "MESH-001/good",
+        vec![
+            ("box.glb".into(), cube().glb()),
+            ("dense.glb".into(), dense().glb()),
+        ],
+    );
 }
 
 fn crowd(instances: u16) -> Vec<u8> {
@@ -244,7 +252,31 @@ fn mesh_003(out: &mut Vec<File>) {
     let mesh = good.grid_mesh("table", 3_000, None);
     good.node("table", mesh, 0.0);
     good.dead_bytes(6 * 1024);
-    add(out, "MESH-003/good", vec![("table.glb".into(), good.glb())]);
+    // 100 KB that only an EXT_structural_metadata property table points at (3D Tiles, CesiumJS)
+    let mut tiles = cube();
+    let values = tiles.raw_view(&vec![0; 100 * 1024]);
+    let offsets = tiles.raw_view(&vec![0; 4 * 1024]);
+    tiles.extension(
+        "EXT_structural_metadata",
+        json!({
+            "schema": { "classes": { "building": { "properties": {
+                "name": { "type": "STRING" }
+            } } } },
+            "propertyTables": [{
+                "class": "building",
+                "count": 1023,
+                "properties": { "name": { "values": values, "stringOffsets": offsets } }
+            }]
+        }),
+    );
+    add(
+        out,
+        "MESH-003/good",
+        vec![
+            ("table.glb".into(), good.glb()),
+            ("tile-metadata.glb".into(), tiles.glb()),
+        ],
+    );
 }
 
 fn tex_001(out: &mut Vec<File>) {

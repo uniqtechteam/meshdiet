@@ -54,8 +54,9 @@ pub struct Document {
     pub images: Vec<Image>,
     /// Textures.
     pub textures: Vec<Texture>,
-    /// Every bufferView index named by a `bufferView` key anywhere in the JSON: accessors, sparse
-    /// parts, images and extensions such as Draco.
+    /// Every bufferView index named by a `bufferView` key anywhere in the JSON (accessors, sparse
+    /// parts, images and extensions such as Draco), plus the property tables of
+    /// `EXT_structural_metadata`, which name theirs differently.
     #[serde(skip)]
     pub view_refs: BTreeSet<usize>,
     /// Materials (names and the normal map, nothing else).
@@ -308,6 +309,7 @@ impl Document {
         let mut doc =
             Self::deserialize(&value).map_err(|e| format!("the glTF JSON cannot be read: {e}"))?;
         collect_view_refs(&value, &mut doc.view_refs);
+        collect_property_table_views(&value, &mut doc.view_refs);
         Ok(doc)
     }
 
@@ -336,5 +338,57 @@ fn collect_view_refs(value: &Value, out: &mut BTreeSet<usize>) {
             Value::Array(items) => stack.extend(items),
             _ => {}
         }
+    }
+}
+
+/// Structural metadata for 3D Tiles and `CesiumJS`.
+pub const EXT_STRUCTURAL_METADATA: &str = "EXT_structural_metadata";
+
+/// `EXT_structural_metadata` property tables point at bufferViews through `values`,
+/// `arrayOffsets` and `stringOffsets`, not through a `bufferView` key.
+fn collect_property_table_views(value: &Value, out: &mut BTreeSet<usize>) {
+    let Some(tables) = value
+        .get("extensions")
+        .and_then(|e| e.get(EXT_STRUCTURAL_METADATA))
+        .and_then(|m| m.get("propertyTables"))
+        .and_then(Value::as_array)
+    else {
+        return;
+    };
+    let properties = tables
+        .iter()
+        .filter_map(|t| t.get("properties")?.as_object())
+        .flat_map(serde_json::Map::values);
+    for property in properties {
+        for key in ["values", "arrayOffsets", "stringOffsets"] {
+            if let Some(i) = property
+                .get(key)
+                .and_then(Value::as_u64)
+                .and_then(|i| usize::try_from(i).ok())
+            {
+                out.insert(i);
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn property_tables_count_as_view_users() {
+        let doc = Document::parse(
+            br#"{"asset":{"version":"2.0"},"extensions":{"EXT_structural_metadata":{
+                "propertyTables":[{"count":2,"properties":{
+                    "name":{"values":3,"stringOffsets":4},
+                    "tags":{"values":5,"arrayOffsets":6},
+                    "height":{"values":7}}}]}}}"#,
+        )
+        .unwrap_or_default();
+        assert_eq!(
+            doc.view_refs.into_iter().collect::<Vec<_>>(),
+            vec![3, 4, 5, 6, 7]
+        );
     }
 }
