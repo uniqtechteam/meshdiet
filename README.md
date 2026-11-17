@@ -5,8 +5,8 @@ Find the 3D models that make your website slow. meshdiet is a command line tool 
 Draco or meshopt compression, textures that are too big, and a total nobody added up.
 
 It is early work. Today `meshdiet scan` reads every model under a folder (container, JSON, external
-files and image headers, nothing decoded), reports files that cannot be read, and prints the measured
-sizes as JSON. The weight checks come next; the first release will come with install steps.
+files and image headers, nothing decoded), checks geometry, textures and size budgets, and adds up
+what every model weighs. The first release will come with install steps.
 
 ```console
 $ meshdiet scan tests/fixtures/GLTF-001/bad --quiet
