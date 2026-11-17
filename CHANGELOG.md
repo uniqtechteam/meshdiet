@@ -31,6 +31,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   pointed to WebP). TEX-004: an image over 1 MB. A `KHR_texture_basisu` texture counts as KTX2 even
   with a PNG fallback. Each image in the JSON report now says what its PNG header declares about
   transparency (`alpha`).
+- GLTF-002: a `.gltf` that stores a buffer or image as a base64 data URI over 16 KB, with the bytes base64
+  adds; the fix is to convert it to `.glb`.
+- LOAD-001: models compressed with Draco, meshopt or KTX2 while the app's JS, TS or HTML never sets up
+  that decoder (`DRACOLoader`, `MeshoptDecoder`, `KTX2Loader`, drei `useGLTF` for Draco and meshopt,
+  `<model-viewer>`). One finding per missing decoder, naming up to five models. It reads the scanned folder,
+  or the folder given with `--src`, by plain text search; it stays quiet when it finds no sources, no
+  three.js glTF loader, or a Babylon.js app (Babylon fetches its decoders itself). Medium confidence, so it
+  fails a build only with `--strict`.
 - Readable output grouped by file with a summary line, or `--format json` (schema 1) for scripts;
   `--output FILE`, `--quiet`, `--verbose`, and no colour when piped or when `NO_COLOR` is set.
 - Exit codes for CI: 0 when nothing reaches `--fail-on` (high by default), 1 when something does, 2 for
