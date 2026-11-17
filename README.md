@@ -32,6 +32,10 @@ build_max = "20 MB"   # SIZE-002, off unless set
 Sizes are decimal (1 MB = 1,000,000 bytes). `--gzip` adds a gzip -6 transfer estimate per file; your
 server may use brotli or nothing, so treat it as a rough guide.
 
+If your build keeps each source model next to the compressed copy the app loads (`chair.glb` and
+`chair-compressed.glb`, or gltfjsx's `chair-transformed.glb`), the source still counts in the weight
+but its own findings are left out, unless your code loads it by name.
+
 The same file sets the gate, what to scan and what to leave out. Unknown keys and rule ids are an
 error, so a typo never switches a check off quietly:
 
