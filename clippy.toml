@@ -1,0 +1,2 @@
+# Words that are names, not code, in doc comments.
+doc-valid-idents = ["glTF", "GLB", "KTX2", "WebP", "AVIF", "Draco", "meshopt", "gltfpack", "SARIF", ".."]
