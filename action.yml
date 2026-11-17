@@ -1,0 +1,291 @@
+name: meshdiet
+description: "Find the 3D models that make your website slow: audits GLB and glTF weight on every pull request."
+author: UniqTech
+branding:
+  icon: box
+  color: orange
+
+inputs:
+  path:
+    description: "Folders or model files to scan, separated by spaces or new lines. Empty means `paths` in meshdiet.toml, else the repository root."
+    default: ""
+  src:
+    description: "Folder with the app's JS/TS/HTML, searched for decoder setup (LOAD-001). Defaults to the scanned folder."
+    default: ""
+  config:
+    description: "Path to meshdiet.toml. Empty means meshdiet.toml in the scanned folder, else in the working directory, when there is one."
+    default: ""
+  baseline:
+    description: "Baseline file written by `meshdiet scan --write-baseline`; only new findings and growth are reported."
+    default: ""
+  fail-on:
+    description: "Fail the job on findings at least this severe: high, medium, low or never. Empty means `fail_on` in meshdiet.toml, else high."
+    default: ""
+  format:
+    description: "Format of the report file kept for later steps (output `report-file`): markdown, json, sarif or pretty."
+    default: markdown
+  summary:
+    description: "Write the Markdown report to the job summary."
+    default: "true"
+  sarif:
+    description: "Upload SARIF to GitHub code scanning (the job needs `security-events: write`)."
+    default: "true"
+  args:
+    description: "Extra arguments for `meshdiet scan`, for example `--strict --skip TEX-002`."
+    default: ""
+  version:
+    description: "meshdiet release to install, for example v0.1.0. Empty means the release this Action is pinned to when that is a full version tag, else the latest release."
+    default: ""
+  install-gltfpack:
+    description: "Also install the pinned gltfpack (1.3, SHA-256 checked) and put it on PATH, so later steps can run `meshdiet fix`. Linux x64, macOS arm64 and Windows x64 only."
+    default: "false"
+  binary:
+    description: "Path to a meshdiet binary already on the runner; skips the download (used to test the Action itself)."
+    default: ""
+
+outputs:
+  findings:
+    description: "Number of findings reported (after ignores and the baseline)."
+    value: ${{ steps.scan.outputs.findings }}
+  high:
+    description: "Number of high findings."
+    value: ${{ steps.scan.outputs.high }}
+  medium:
+    description: "Number of medium findings."
+    value: ${{ steps.scan.outputs.medium }}
+  low:
+    description: "Number of low findings."
+    value: ${{ steps.scan.outputs.low }}
+  files:
+    description: "Number of models scanned."
+    value: ${{ steps.scan.outputs.files }}
+  total-bytes:
+    description: "What every scanned model weighs together, in bytes (shared files counted once)."
+    value: ${{ steps.scan.outputs.total-bytes }}
+  uncompressed-bytes:
+    description: "Bytes in models with no geometry compression."
+    value: ${{ steps.scan.outputs.uncompressed-bytes }}
+  exit-code:
+    description: "meshdiet's exit code at the fail-on threshold: 0 passed, 1 failed."
+    value: ${{ steps.scan.outputs.exit-code }}
+  report-file:
+    description: "Path of the report in the format asked for."
+    value: ${{ steps.scan.outputs.report-file }}
+  sarif-file:
+    description: "Path of the SARIF report."
+    value: ${{ steps.scan.outputs.sarif-file }}
+  gltfpack:
+    description: "Path of the installed gltfpack, when install-gltfpack is true."
+    value: ${{ steps.gltfpack.outputs.path }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install meshdiet
+      id: install
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        VERSION: ${{ inputs.version }}
+        ACTION_REF: ${{ github.action_ref }}
+        BINARY: ${{ inputs.binary }}
+      run: |
+        set -euo pipefail
+        if [ -n "$BINARY" ]; then
+          echo "bin=$BINARY" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        case "${RUNNER_OS}-${RUNNER_ARCH}" in
+          Linux-X64)   target=x86_64-unknown-linux-musl;  ext=tar.gz ;;
+          Linux-ARM64) target=aarch64-unknown-linux-musl; ext=tar.gz ;;
+          macOS-X64)   target=x86_64-apple-darwin;        ext=tar.gz ;;
+          macOS-ARM64) target=aarch64-apple-darwin;       ext=tar.gz ;;
+          Windows-X64) target=x86_64-pc-windows-msvc;     ext=zip ;;
+          *)
+            echo "::error::meshdiet has no release build for ${RUNNER_OS}-${RUNNER_ARCH}. Install it with 'cargo install meshdiet' and pass its path as the 'binary' input."
+            exit 1 ;;
+        esac
+        # An explicit version wins; then the tag this Action was used at (uses: ...@v0.1.0);
+        # a moving tag such as v0 or a branch falls back to the latest release.
+        if [ -z "$VERSION" ] && [[ "$ACTION_REF" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+          VERSION=$ACTION_REF
+        fi
+        if [ -z "$VERSION" ] || [ "$VERSION" = latest ]; then
+          VERSION=$(gh release view --repo uniqtechteam/meshdiet --json tagName --jq .tagName)
+        fi
+        case "$VERSION" in v*) ;; *) VERSION="v$VERSION" ;; esac
+        asset="meshdiet-${VERSION#v}-${target}.${ext}"
+        dir="$RUNNER_TEMP/meshdiet-${VERSION}"
+        mkdir -p "$dir"
+        echo "Installing meshdiet $VERSION ($target)"
+        gh release download "$VERSION" --repo uniqtechteam/meshdiet \
+          --pattern "$asset" --pattern SHA256SUMS --dir "$dir" --clobber
+        cd "$dir"
+        expected=$(awk -v f="$asset" '$2 == f || $2 == "*" f { print $1 }' SHA256SUMS)
+        if command -v sha256sum >/dev/null; then
+          actual=$(sha256sum "$asset" | awk '{ print $1 }')
+        else
+          actual=$(shasum -a 256 "$asset" | awk '{ print $1 }')
+        fi
+        if [ -z "$expected" ] || [ "$expected" != "$actual" ]; then
+          echo "::error::checksum mismatch for $asset: expected '${expected:-none in SHA256SUMS}', got '$actual'"
+          exit 1
+        fi
+        echo "$asset: SHA-256 $actual (matches SHA256SUMS)"
+        if [ "$ext" = zip ]; then
+          pwsh -NoProfile -Command "Expand-Archive -Force -Path '$asset' -DestinationPath '.'"
+          bin="$dir/${asset%.zip}/meshdiet.exe"
+        else
+          tar xzf "$asset"
+          bin="$dir/${asset%.tar.gz}/meshdiet"
+        fi
+        "$bin" --version
+        # on PATH for later steps too, such as `meshdiet fix` with install-gltfpack
+        dirname "$bin" >> "$GITHUB_PATH"
+        echo "bin=$bin" >> "$GITHUB_OUTPUT"
+
+    - name: Install gltfpack
+      id: gltfpack
+      if: ${{ inputs.install-gltfpack == 'true' }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        # gltfpack 1.3 from github.com/zeux/meshoptimizer/releases, the version meshdiet fix is
+        # tested with. The hashes are of the release zips, checked before anything is unpacked.
+        case "${RUNNER_OS}-${RUNNER_ARCH}" in
+          Linux-X64)   zip=gltfpack-ubuntu.zip;  sha=0666d9dc40d60fe5b9a45f3fc24f8e6ca87112974bd5de9ca57152aa13d06017; exe=gltfpack ;;
+          macOS-ARM64) zip=gltfpack-macos.zip;   sha=1002fe6a437aa005eca541502c27b8d2b184f91f4ad0c6d282e3614a1e35e75a; exe=gltfpack ;;
+          Windows-X64) zip=gltfpack-windows.zip; sha=f6e9c09d66af23da3da71b86f0652d2413e81c734e0aecd1cd3d0e6e6e8645c0; exe=gltfpack.exe ;;
+          *)
+            echo "::error::gltfpack 1.3 has no release build for ${RUNNER_OS}-${RUNNER_ARCH} (there are Linux x64, macOS arm64 and Windows x64 builds). Build it from source and put it on PATH instead."
+            exit 1 ;;
+        esac
+        dir="$RUNNER_TEMP/gltfpack-1.3"
+        mkdir -p "$dir"
+        cd "$dir"
+        curl -sSfL --retry 3 -o "$zip" "https://github.com/zeux/meshoptimizer/releases/download/v1.3/$zip"
+        if command -v sha256sum >/dev/null; then
+          actual=$(sha256sum "$zip" | awk '{ print $1 }')
+        else
+          actual=$(shasum -a 256 "$zip" | awk '{ print $1 }')
+        fi
+        if [ "$actual" != "$sha" ]; then
+          echo "::error::checksum mismatch for $zip: expected '$sha', got '$actual'"
+          exit 1
+        fi
+        echo "$zip: SHA-256 $actual (matches the pinned hash)"
+        if [ "$RUNNER_OS" = Windows ]; then
+          pwsh -NoProfile -Command "Expand-Archive -Force -Path '$zip' -DestinationPath '.'"
+        else
+          unzip -o -q "$zip"
+          chmod +x "$exe"
+        fi
+        echo "$dir" >> "$GITHUB_PATH"
+        echo "path=$dir/$exe" >> "$GITHUB_OUTPUT"
+
+    - name: Scan
+      id: scan
+      shell: bash
+      env:
+        BIN: ${{ steps.install.outputs.bin }}
+        SCAN_PATH: ${{ inputs.path }}
+        SRC: ${{ inputs.src }}
+        CONFIG: ${{ inputs.config }}
+        BASELINE: ${{ inputs.baseline }}
+        FAIL_ON: ${{ inputs.fail-on }}
+        FORMAT: ${{ inputs.format }}
+        SUMMARY: ${{ inputs.summary }}
+        EXTRA: ${{ inputs.args }}
+      run: |
+        # no -u: bash 3.2 (macOS) treats an empty array as unset
+        set -o pipefail
+        set -f  # paths and args are split on whitespace, never globbed
+        # shellcheck disable=SC2206
+        args=($SCAN_PATH)
+        [ -n "$SRC" ] && args+=(--src "$SRC")
+        [ -n "$CONFIG" ] && args+=(--config "$CONFIG")
+        [ -n "$BASELINE" ] && args+=(--baseline "$BASELINE")
+        # shellcheck disable=SC2206
+        args+=($EXTRA)
+        case "$FORMAT" in
+          markdown) ext=md ;;
+          json|sarif) ext=$FORMAT ;;
+          pretty) ext=txt ;;
+          *) echo "::error::format must be markdown, json, sarif or pretty, not '$FORMAT'"; exit 2 ;;
+        esac
+        gate=()
+        [ -n "$FAIL_ON" ] && gate=(--fail-on "$FAIL_ON")
+
+        # The gate: readable output in the log, and the exit code that decides the job.
+        "$BIN" scan "${args[@]}" "${gate[@]}"
+        code=$?
+        if [ "$code" -gt 1 ]; then
+          echo "::error::meshdiet could not run the scan (exit $code); see the log above."
+          exit "$code"
+        fi
+
+        # The same scan as reports. The gate already decided, so these never fail on findings.
+        json="$RUNNER_TEMP/meshdiet.json"
+        sarif="$RUNNER_TEMP/meshdiet.sarif"
+        report="$RUNNER_TEMP/meshdiet-report.$ext"
+        "$BIN" scan "${args[@]}" --fail-on never --format json --output "$json" || exit 2
+        "$BIN" scan "${args[@]}" --fail-on never --format sarif --output "$sarif" || exit 2
+        if [ "$FORMAT" != json ] && [ "$FORMAT" != sarif ]; then
+          "$BIN" scan "${args[@]}" --fail-on never --format "$FORMAT" --output "$report" || exit 2
+        else
+          cp "$RUNNER_TEMP/meshdiet.$FORMAT" "$report"
+        fi
+        if [ "$SUMMARY" = true ]; then
+          if [ "$FORMAT" = markdown ]; then
+            cat "$report" >> "$GITHUB_STEP_SUMMARY"
+          else
+            "$BIN" scan "${args[@]}" --fail-on never --format markdown >> "$GITHUB_STEP_SUMMARY" || exit 2
+          fi
+        fi
+
+        jq -r '
+          "findings=\(.findings | length)",
+          "high=\(.summary.high)",
+          "medium=\(.summary.medium)",
+          "low=\(.summary.low)",
+          "files=\(.totals.assets)",
+          "total-bytes=\(.totals.bytes)",
+          "uncompressed-bytes=\(.totals.uncompressed_bytes)"
+        ' "$json" >> "$GITHUB_OUTPUT" || exit 2
+        {
+          echo "exit-code=$code"
+          echo "report-file=$report"
+          echo "sarif-file=$sarif"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Check SARIF upload
+      id: can-upload
+      if: ${{ inputs.sarif == 'true' }}
+      shell: bash
+      env:
+        HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+      run: |
+        # A pull request from a fork gets a read-only token, so code scanning would refuse it.
+        if [ -n "$HEAD_REPO" ] && [ "$HEAD_REPO" != "$GITHUB_REPOSITORY" ]; then
+          echo "::notice::Pull request from a fork: skipping the SARIF upload. The job summary has the full report."
+          echo "upload=false" >> "$GITHUB_OUTPUT"
+        else
+          echo "upload=true" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Upload to code scanning
+      if: ${{ inputs.sarif == 'true' && steps.can-upload.outputs.upload == 'true' }}
+      uses: github/codeql-action/upload-sarif@v4
+      with:
+        sarif_file: ${{ steps.scan.outputs.sarif-file }}
+        category: meshdiet
+      continue-on-error: true
+
+    - name: Fail on findings
+      if: ${{ steps.scan.outputs.exit-code != '0' }}
+      shell: bash
+      env:
+        FAIL_ON: ${{ inputs.fail-on }}
+      run: |
+        echo "::error::meshdiet found problems at or above '${FAIL_ON:-the configured threshold}'. See the job summary for the files."
+        exit 1

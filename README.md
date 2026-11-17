@@ -76,6 +76,57 @@ with the measured numbers in its properties and a stable fingerprint). `--format
 summary, findings, weight table and pages for a job summary or a pull request comment, for example
 `meshdiet scan public --format markdown >> "$GITHUB_STEP_SUMMARY"`. `--format json` is for scripts.
 
+### GitHub Action
+
+The Action installs a meshdiet release for the runner (its SHA-256 checked against the release's
+`SHA256SUMS`), scans, writes the Markdown report to the job summary, uploads SARIF to code scanning
+and fails the job at `fail-on`. It needs no Rust on the runner and does not upload your models
+anywhere; the summary and SARIF hold paths and numbers only. It works once the first release is out.
+
+```yaml
+# .github/workflows/meshdiet.yml
+name: meshdiet
+on: [pull_request]
+
+permissions:
+  contents: read
+  security-events: write   # only for the SARIF upload; drop it with `sarif: "false"`
+
+jobs:
+  models:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: uniqtechteam/meshdiet@v0
+        with:
+          path: public
+          src: src
+          fail-on: high
+          version: v0.1.0   # pin the release you tested with
+```
+
+| Input | Default | What it does |
+|---|---|---|
+| `path` | `paths` in meshdiet.toml, else `.` | Folders or model files, separated by spaces or new lines |
+| `src` | the scanned folder | App code searched for decoder setup (LOAD-001) |
+| `config` | meshdiet.toml when there is one | Config file |
+| `baseline` | none | Report only what is new or grew since this baseline |
+| `fail-on` | `fail_on` in meshdiet.toml, else `high` | `high`, `medium`, `low` or `never` |
+| `format` | `markdown` | Format of the report file kept for later steps (`markdown`, `json`, `sarif`, `pretty`) |
+| `summary` | `true` | Write the Markdown report to the job summary |
+| `sarif` | `true` | Upload SARIF to code scanning (skipped with a note on pull requests from forks) |
+| `args` | none | Extra `meshdiet scan` flags, for example `--strict --skip TEX-002` |
+| `version` | the tag the Action is used at, else the latest release | meshdiet release to install |
+| `install-gltfpack` | `false` | Install gltfpack 1.3 (pinned zip, SHA-256 checked) on PATH for `meshdiet fix`; Linux x64, macOS arm64 and Windows x64 |
+
+Outputs: `findings`, `high`, `medium`, `low`, `files`, `total-bytes`, `uncompressed-bytes`,
+`exit-code`, `report-file`, `sarif-file` and `gltfpack`. With `format: markdown`, `report-file` is
+ready to post as a pull request comment.
+
+The downloaded `meshdiet` stays on PATH for the rest of the job, so with `install-gltfpack: "true"`
+a later step can run `meshdiet fix public/models --out models-opt` and upload the result. The
+meshdiet command itself never downloads gltfpack; only the Action does, at a pinned version.
+
 ### Decoders
 
 A model compressed with Draco, meshopt or KTX2 only loads when the app sets up the matching decoder

@@ -79,3 +79,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   and pull request comments, with the weight and page tables).
 - `meshdiet rules` lists every rule with its severity and confidence; `meshdiet explain RULE` says why
   it matters, how to fix it with gltfpack or glTF Transform, and what the loader needs after the fix.
+- A GitHub Action (`uses: uniqtechteam/meshdiet@v0`): installs the meshdiet release for the runner and
+  checks its SHA-256, writes the Markdown report to the job summary, uploads SARIF to code scanning and
+  fails the job at `fail-on`. Outputs carry the finding counts and total bytes. `install-gltfpack`
+  adds gltfpack 1.3, pinned and checksum-checked, so a later step can run `meshdiet fix`.
