@@ -6,12 +6,19 @@
 #![forbid(unsafe_code)]
 
 pub mod asset;
+mod config;
+mod finding;
 pub mod glb;
 pub mod gltf;
 pub mod images;
+mod report;
+pub mod rule;
 pub mod walk;
 
 pub use asset::{Asset, AssetKind, Compression, Estimate, ImageInfo, ImageSource};
+pub use config::Config;
+pub use finding::{Confidence, Finding, Measured, Severity};
+pub use report::{FailOn, Options, Report, SCHEMA, Summary, Totals, scan, scan_with};
 
 /// Version of the engine, shown by `meshdiet --version`.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
