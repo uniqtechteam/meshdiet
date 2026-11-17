@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="940" height="618" viewBox="0 0 940 618" role="img" aria-label="meshdiet fix on 12 public projects: 280.6 MB → 130.7 MB">
+<style>
+  .title { font: 600 16px system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: #0b0b0b; }
+  .axis, .value { font: 13px system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: #0b0b0b; }
+  .note { font: 11px system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: #52514e; }
+  .before { fill: #2a78d6; } .after { fill: #eb6834; }
+  @media (prefers-color-scheme: dark) {
+    .title, .axis, .value { fill: #f0efec; } .note { fill: #c3c2b7; }
+    .before { fill: #3987e5; } .after { fill: #d95926; }
+  }
+</style>
+<text x="20" y="30" class="title">meshdiet fix on 12 public projects: 280.6 MB → 130.7 MB</text>
+<text x="20" y="52" class="note">385 models, sizes of every scanned model before and after (skipped and kept models count at their original size)</text>
+<rect x="342" y="64" width="11" height="11" rx="2" class="before"/><text x="358" y="74" class="value">before</text>
+<rect x="422" y="64" width="11" height="11" rx="2" class="after"/><text x="438" y="74" class="value">after meshdiet fix</text>
+<text x="330" y="105" text-anchor="end" class="axis">mrdoob/three.js</text>
+<text x="330" y="123" text-anchor="end" class="note">50 models</text>
+<rect x="342" y="92" width="330.0" height="11" rx="2" class="before"/>
+<rect x="342" y="105" width="178.9" height="11" rx="2" class="after"/>
+<text x="680.0" y="108" class="value">99.68 MB → 54.05 MB  (−46%)</text>
+<text x="330" y="145" text-anchor="end" class="axis">google/model-viewer</text>
+<text x="330" y="163" text-anchor="end" class="note">41 models</text>
+<rect x="342" y="132" width="278.6" height="11" rx="2" class="before"/>
+<rect x="342" y="145" width="131.0" height="11" rx="2" class="after"/>
+<text x="628.6" y="148" class="value">84.14 MB → 39.56 MB  (−53%)</text>
+<text x="330" y="185" text-anchor="end" class="axis">immersive-web/webxr-samples</text>
+<text x="330" y="203" text-anchor="end" class="note">13 models</text>
+<rect x="342" y="172" width="196.1" height="11" rx="2" class="before"/>
+<rect x="342" y="185" width="67.3" height="11" rx="2" class="after"/>
+<text x="546.1" y="188" class="value">59.24 MB → 20.32 MB  (−66%)</text>
+<text x="330" y="225" text-anchor="end" class="axis">adrianhajdin/project_3D_developer_portfolio</text>
+<text x="330" y="243" text-anchor="end" class="note">2 models</text>
+<rect x="342" y="212" width="62.0" height="11" rx="2" class="before"/>
+<rect x="342" y="225" width="11.4" height="11" rx="2" class="after"/>
+<text x="412.0" y="228" class="value">18.74 MB → 3.44 MB  (−82%)</text>
+<text x="330" y="265" text-anchor="end" class="axis">brunosimon/folio-2025</text>
+<text x="330" y="283" text-anchor="end" class="note">64 models</text>
+<rect x="342" y="252" width="20.8" height="11" rx="2" class="before"/>
+<rect x="342" y="265" width="19.7" height="11" rx="2" class="after"/>
+<text x="370.8" y="268" class="value">6.28 MB → 5.95 MB  (−5%)</text>
+<text x="330" y="305" text-anchor="end" class="axis">CesiumGS/3d-tiles-samples</text>
+<text x="330" y="323" text-anchor="end" class="note">104 models</text>
+<rect x="342" y="292" width="16.0" height="11" rx="2" class="before"/>
+<rect x="342" y="305" width="9.9" height="11" rx="2" class="after"/>
+<text x="366.0" y="308" class="value">4.84 MB → 3.00 MB  (−38%)</text>
+<text x="330" y="345" text-anchor="end" class="axis">adrianhajdin/3D_portfolio</text>
+<text x="330" y="363" text-anchor="end" class="note">5 models</text>
+<rect x="342" y="332" width="12.9" height="11" rx="2" class="before"/>
+<rect x="342" y="345" width="4.3" height="11" rx="2" class="after"/>
+<text x="362.9" y="348" class="value">3.90 MB → 1.31 MB  (−66%)</text>
+<text x="330" y="385" text-anchor="end" class="axis">brunosimon/folio-2019</text>
+<text x="330" y="403" text-anchor="end" class="note">92 models</text>
+<rect x="342" y="372" width="5.3" height="11" rx="2" class="before"/>
+<rect x="342" y="385" width="4.8" height="11" rx="2" class="after"/>
+<text x="355.3" y="388" class="value">1.59 MB → 1.46 MB  (−8%)</text>
+<text x="330" y="425" text-anchor="end" class="axis">adrianhajdin/project_threejs_ai</text>
+<text x="330" y="443" text-anchor="end" class="note">1 model</text>
+<rect x="342" y="412" width="3.5" height="11" rx="2" class="before"/>
+<rect x="342" y="425" width="1.9" height="11" rx="2" class="after"/>
+<text x="353.5" y="428" class="value">1.05 MB → 0.57 MB  (−46%)</text>
+<text x="330" y="465" text-anchor="end" class="axis">pmndrs/racing-game</text>
+<text x="330" y="483" text-anchor="end" class="note">3 models</text>
+<rect x="342" y="452" width="2.2" height="11" rx="2" class="before"/>
+<rect x="342" y="465" width="2.2" height="11" rx="2" class="after"/>
+<text x="352.2" y="468" class="value">0.67 MB → 0.67 MB  (nothing to fix)</text>
+<text x="330" y="505" text-anchor="end" class="axis">brunosimon/my-room-in-3d</text>
+<text x="330" y="523" text-anchor="end" class="note">8 models</text>
+<rect x="342" y="492" width="1.5" height="11" rx="2" class="before"/>
+<rect x="342" y="505" width="1.5" height="11" rx="2" class="after"/>
+<text x="351.1" y="508" class="value">0.33 MB → 0.33 MB  (nothing to fix)</text>
+<text x="330" y="545" text-anchor="end" class="axis">pmndrs/react-three-next</text>
+<text x="330" y="563" text-anchor="end" class="note">2 models</text>
+<rect x="342" y="532" width="1.5" height="11" rx="2" class="before"/>
+<rect x="342" y="545" width="1.5" height="11" rx="2" class="after"/>
+<text x="350.6" y="548" class="value">0.17 MB → 0.03 MB  (−82%)</text>
+<text x="20" y="602" class="note">meshdiet df02b11, gltfpack 1.3, meshdiet fix --out on shallow clones, 2026-11-17 · 1 MB = 1,000,000 bytes · details in docs/qa.md</text>
+</svg>

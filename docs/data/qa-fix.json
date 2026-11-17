@@ -1,0 +1,20 @@
+{
+  "source": "docs/qa.md: meshdiet df02b11 (release build), gltfpack 1.3, `meshdiet fix --out` on shallow clones, 2026-11-17",
+  "chart_note": "meshdiet df02b11, gltfpack 1.3, meshdiet fix --out on shallow clones, 2026-11-17 · 1 MB = 1,000,000 bytes · details in docs/qa.md",
+  "unit": "MB (1 MB = 1,000,000 bytes)",
+  "note": "before and after count every scanned model; skipped and kept models count at their original size",
+  "repos": [
+    {"name": "mrdoob/three.js", "part": "examples/models", "commit": "484850fa1a5ff3be350f4e01c5d1cd68c5c67b96", "models": 50, "before": 99.68, "after": 54.05},
+    {"name": "google/model-viewer", "part": "shared-assets, modelviewer.dev", "commit": "d1124d71432e05a2d7e8ea5ecbe41333bad0b350", "models": 41, "before": 84.14, "after": 39.56},
+    {"name": "immersive-web/webxr-samples", "part": "", "commit": "38d24f39ebaff7353946a5465a3bb15213f2847e", "models": 13, "before": 59.24, "after": 20.32},
+    {"name": "adrianhajdin/project_3D_developer_portfolio", "part": "", "commit": "9985e4bf4ce35dfbc0b3c0e90d4d37dc3c67b2d7", "models": 2, "before": 18.74, "after": 3.44},
+    {"name": "brunosimon/folio-2025", "part": "static/", "commit": "70764a94756cc4de564e493c8ba46c4b5fe03ed1", "models": 64, "before": 6.28, "after": 5.95},
+    {"name": "CesiumGS/3d-tiles-samples", "part": "", "commit": "a30bfdf2d6cc55f4c3078e8aea3a793af6ebfd56", "models": 104, "before": 4.84, "after": 3.00},
+    {"name": "adrianhajdin/3D_portfolio", "part": "", "commit": "057380c3c325838333094e3fe2f68ec8403e9d9d", "models": 5, "before": 3.90, "after": 1.31},
+    {"name": "brunosimon/folio-2019", "part": "", "commit": "540f13573a6da282eae942a4c67335b97cd18970", "models": 92, "before": 1.59, "after": 1.46},
+    {"name": "adrianhajdin/project_threejs_ai", "part": "", "commit": "bbe1d55b16267a9d115555be8ed2e2a2e2bb957b", "models": 1, "before": 1.05, "after": 0.57},
+    {"name": "pmndrs/racing-game", "part": "", "commit": "7816a5d954b75e6ad853ae4e4f0cbbd628072643", "models": 3, "before": 0.67, "after": 0.67},
+    {"name": "brunosimon/my-room-in-3d", "part": "", "commit": "5d00b3f870da81f103e901e0d12e20bbcc816834", "models": 8, "before": 0.33, "after": 0.33},
+    {"name": "pmndrs/react-three-next", "part": "", "commit": "bb29a61949601e1c563688faf33a12d062ec3710", "models": 2, "before": 0.17, "after": 0.03}
+  ]
+}
