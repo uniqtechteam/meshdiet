@@ -5,9 +5,13 @@
 
 #![forbid(unsafe_code)]
 
+pub mod asset;
 pub mod glb;
 pub mod gltf;
 pub mod images;
+pub mod walk;
+
+pub use asset::{Asset, AssetKind, Compression, Estimate, ImageInfo, ImageSource};
 
 /// Version of the engine, shown by `meshdiet --version`.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
