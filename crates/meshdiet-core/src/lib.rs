@@ -13,6 +13,7 @@ pub mod gltf;
 pub mod images;
 mod report;
 pub mod rule;
+pub mod rules;
 pub mod walk;
 
 pub use asset::{Asset, AssetKind, Compression, Estimate, ImageInfo, ImageSource};
