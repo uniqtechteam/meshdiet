@@ -4,6 +4,7 @@
 
 mod explain;
 mod fix;
+mod markdown;
 mod output;
 mod sarif;
 
@@ -111,6 +112,8 @@ enum Format {
     Json,
     /// SARIF 2.1.0, for GitHub code scanning.
     Sarif,
+    /// Markdown, for a CI job summary or a pull request comment.
+    Markdown,
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -194,9 +197,9 @@ fn scan(args: &ScanArgs) -> Result<ExitCode, String> {
     {
         return Err(format!("--src {} is not a folder", src.display()));
     }
-    if args.fix && matches!(args.format, Format::Json) {
+    if args.fix && !matches!(args.format, Format::Pretty) {
         return Err(
-            "--fix prints a second report; use `meshdiet fix --format json` for JSON".into(),
+            "--fix prints a second, readable report, so it works only with --format pretty; run `meshdiet fix --format json` for JSON".into(),
         );
     }
     let config = config(args.config.as_deref(), &args.paths)?;
@@ -261,6 +264,7 @@ fn scan(args: &ScanArgs) -> Result<ExitCode, String> {
         ),
         Format::Json => output::json(&report),
         Format::Sarif => sarif::render(&report),
+        Format::Markdown => markdown::render(&report, args.all),
     };
     match &args.output {
         Some(file) => std::fs::write(file, text),
