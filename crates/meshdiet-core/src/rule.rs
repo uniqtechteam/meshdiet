@@ -45,11 +45,13 @@ pub const GLTF_001: RuleInfo = RuleInfo {
 /// Every rule, in the order they run. The asset rules arrive with TASK-RULE-001…003.
 #[must_use]
 pub fn all() -> Vec<Box<dyn Rule>> {
-    vec![
+    let mut rules: Vec<Box<dyn Rule>> = vec![
         Box::new(mesh::UncompressedGeometry),
         Box::new(mesh::TriangleBudget),
         Box::new(mesh::UnusedBufferBytes),
-    ]
+    ];
+    rules.extend(crate::rules::texture::rules());
+    rules
 }
 
 /// Info for every rule the engine reports, in id order.

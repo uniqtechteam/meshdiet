@@ -1,7 +1,8 @@
-//! Image facts from the first bytes of a file: format, width, height and, for KTX2, the
-//! supercompression scheme. Pixels are never decoded (ADR-003).
+//! Image facts from the first bytes of a file: format, width, height, for PNG whether it can be
+//! transparent, and for KTX2 the supercompression scheme. Pixels are never decoded (ADR-003).
 
 use ktx2::SupercompressionScheme;
+use serde::Serialize;
 
 /// How many bytes of an image are read to find its header. JPEG size markers can sit behind large
 /// EXIF or ICC blocks, so this is generous; it is still a header, not the image.
@@ -18,6 +19,56 @@ pub struct Header {
     pub height: u32,
     /// KTX2 only: `basis-lz`, `zstd`, `zlib` or `none`.
     pub supercompression: Option<&'static str>,
+    /// PNG only: what the header says about transparency.
+    pub alpha: Option<PngAlpha>,
+}
+
+/// What a PNG header says about transparency, from the IHDR colour type and the chunk list before
+/// the image data. The pixels are not looked at, so an RGBA file whose alpha is all opaque still
+/// counts as `Channel`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum PngAlpha {
+    /// Greyscale or RGB, no `tRNS` chunk: the file cannot be transparent.
+    None,
+    /// Greyscale with alpha or RGBA.
+    Channel,
+    /// A `tRNS` chunk adds transparency to a greyscale, RGB or palette image.
+    Trns,
+    /// Palette colours with no `tRNS` chunk.
+    Palette,
+}
+
+/// Transparency of a PNG from its first bytes: the IHDR colour type, then the chunk headers up to
+/// the first `IDAT` (where `tRNS` must appear). `None` when the header is broken or the chunks before
+/// the image data run past `head`, so nothing is claimed that was not read.
+#[must_use]
+pub fn png_alpha(head: &[u8]) -> Option<PngAlpha> {
+    let color_type = *head.get(25)?;
+    if head.get(12..16)? != b"IHDR" {
+        return None;
+    }
+    match color_type {
+        4 | 6 => return Some(PngAlpha::Channel),
+        0 | 2 | 3 => {}
+        _ => return None,
+    }
+    let mut at = 8usize;
+    loop {
+        let len =
+            usize::try_from(u32::from_be_bytes(head.get(at..at + 4)?.try_into().ok()?)).ok()?;
+        match head.get(at + 4..at + 8)? {
+            b"tRNS" => return Some(PngAlpha::Trns),
+            b"IDAT" | b"IEND" => {
+                return Some(if color_type == 3 {
+                    PngAlpha::Palette
+                } else {
+                    PngAlpha::None
+                });
+            }
+            _ => at = at.checked_add(len)?.checked_add(12)?,
+        }
+    }
 }
 
 /// The MIME type from the magic bytes, if the format is one glTF allows.
@@ -68,6 +119,7 @@ pub fn header(head: &[u8]) -> Result<Header, String> {
             width: h.pixel_width,
             height: h.pixel_height,
             supercompression: Some(scheme),
+            alpha: None,
         });
     }
     let size = imagesize::blob_size(head).map_err(|e| format!("bad {mime} header: {e}"))?;
@@ -76,6 +128,11 @@ pub fn header(head: &[u8]) -> Result<Header, String> {
         width: u32::try_from(size.width).unwrap_or(u32::MAX),
         height: u32::try_from(size.height).unwrap_or(u32::MAX),
         supercompression: None,
+        alpha: if mime == "image/png" {
+            png_alpha(head)
+        } else {
+            None
+        },
     })
 }
 
@@ -98,6 +155,57 @@ mod tests {
     fn ac_003_vram_of_4096_square_png_is_89_5_mb() {
         assert_eq!(est_vram("image/png", 4096, 4096), 89_478_485);
         assert_eq!(est_vram("image/png", 2048, 2048), 22_369_621);
+    }
+
+    /// A PNG made of chunk headers only (lengths and CRCs are not checked here).
+    fn png(color_type: u8, chunks: &[(&[u8; 4], u32)]) -> Vec<u8> {
+        let mut out = b"\x89PNG\r\n\x1a\n".to_vec();
+        out.extend(13u32.to_be_bytes());
+        out.extend(b"IHDR");
+        out.extend(64u32.to_be_bytes());
+        out.extend(64u32.to_be_bytes());
+        out.extend([8, color_type, 0, 0, 0]);
+        out.extend([0; 4]);
+        for (name, len) in chunks {
+            out.extend(len.to_be_bytes());
+            out.extend(*name);
+            out.extend(vec![0; *len as usize + 4]);
+        }
+        out
+    }
+
+    #[test]
+    fn png_alpha_comes_from_the_colour_type_and_trns() {
+        let idat = (b"IDAT", 10);
+        assert_eq!(png_alpha(&png(2, &[idat])), Some(PngAlpha::None));
+        assert_eq!(
+            png_alpha(&png(0, &[(b"gAMA", 4), idat])),
+            Some(PngAlpha::None)
+        );
+        assert_eq!(png_alpha(&png(6, &[idat])), Some(PngAlpha::Channel));
+        assert_eq!(png_alpha(&png(4, &[idat])), Some(PngAlpha::Channel));
+        assert_eq!(
+            png_alpha(&png(2, &[(b"tRNS", 6), idat])),
+            Some(PngAlpha::Trns)
+        );
+        assert_eq!(
+            png_alpha(&png(3, &[(b"PLTE", 6), idat])),
+            Some(PngAlpha::Palette)
+        );
+        assert_eq!(
+            png_alpha(&png(3, &[(b"PLTE", 6), (b"tRNS", 2), idat])),
+            Some(PngAlpha::Trns)
+        );
+    }
+
+    #[test]
+    fn png_alpha_claims_nothing_it_did_not_read() {
+        // a big text chunk runs past the bytes read, so a tRNS could still follow
+        let mut head = png(2, &[(b"iTXt", 100_000), (b"IDAT", 10)]);
+        head.truncate(200);
+        assert_eq!(png_alpha(&head), None);
+        assert_eq!(png_alpha(b"\x89PNG\r\n\x1a\n"), None);
+        assert_eq!(png_alpha(&png(2, &[(b"IDAT", 10)])[..30]), None);
     }
 
     #[test]

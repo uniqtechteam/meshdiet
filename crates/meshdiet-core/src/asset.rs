@@ -11,7 +11,7 @@ use serde::Serialize;
 
 use crate::glb::{self, Span};
 use crate::gltf::{self, Document};
-use crate::images;
+use crate::images::{self, PngAlpha};
 
 /// GLB or `.gltf`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -92,6 +92,9 @@ pub struct ImageInfo {
     /// KTX2 supercompression: `basis-lz`, `zstd`, `zlib` or `none`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub supercompression: Option<String>,
+    /// PNG only: transparency as the header declares it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alpha: Option<PngAlpha>,
 }
 
 /// One `.glb` or `.gltf` and everything it pulls in.
@@ -432,6 +435,7 @@ impl Reader<'_> {
                 height: None,
                 est_vram: None,
                 supercompression: None,
+                alpha: None,
             };
             let what = format!("image {index}");
             let head = match (image.buffer_view, image.uri.as_deref()) {
@@ -495,6 +499,7 @@ impl Reader<'_> {
                             estimated: true,
                         });
                         info.supercompression = h.supercompression.map(str::to_owned);
+                        info.alpha = h.alpha;
                     }
                     Err(e) => self.asset.problems.push(format!("{what}: {e}")),
                 },
