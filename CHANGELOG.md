@@ -62,6 +62,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   SIZE-001 flags a file over `file_max` (5 MB by default) with its size split and biggest image,
   SIZE-002 flags the whole build over `build_max`, and SIZE-003 flags a `[pages]` group over its `max`
   with its five largest assets. A page glob that matches nothing is reported as CFG-PAGE, so a typo
-  cannot switch a budget off. The other `meshdiet.toml` keys arrive in a later version.
+  cannot switch a budget off.
 - `--gzip` adds a gzip -6 transfer estimate per file, per page and in total, labelled as an estimate.
   The JSON report gains `pages` and the new `totals` fields.
+- The rest of `meshdiet.toml`: `fail_on`, `paths` (what to scan when you name no folder), `ignore` and
+  `[rules] skip`. Unknown keys, unknown rule ids and sizes such as `"5 MiB"` stop with exit code 2 and
+  the valid choices. `--rules` and `--skip` choose rules for one run.
+- Ignores live in `meshdiet.toml`, since a binary model cannot carry a comment:
+  `{ rule = "TEX-001", path = "public/hero/*.glb", reason = "..." }`. An entry without a reason still
+  applies and is reported as a low `CFG-IGN` finding. `--show-ignored` lists what was left out.
+- A baseline for sites that are already heavy: `--write-baseline FILE` records every finding and every
+  file size, and `--baseline FILE` then reports only what is new, plus any file or build that grew by
+  more than `--tolerance` (1% by default) as `BASE-GROW`. Removed and smaller files are listed as
+  improvements. Every finding now has a `fingerprint` in JSON.
+- `--format sarif` (SARIF 2.1.0, for GitHub code scanning) and `--format markdown` (for job summaries
+  and pull request comments, with the weight and page tables).
+- `meshdiet rules` lists every rule with its severity and confidence; `meshdiet explain RULE` says why
+  it matters, how to fix it with gltfpack or glTF Transform, and what the loader needs after the fix.

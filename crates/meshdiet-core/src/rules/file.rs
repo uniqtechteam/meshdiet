@@ -90,6 +90,7 @@ impl Rule for EmbeddedData {
             fix: "Convert it to one binary file: `meshdiet fix` (gltfpack writes .glb), \
                   `gltf-transform copy in.gltf out.glb`, or `gltfpack -i in.gltf -o out.glb`."
                 .to_owned(),
+            fingerprint: String::new(),
         }]
     }
 }

@@ -203,7 +203,7 @@ pub fn totals(assets: &[Asset], config: &Config) -> Totals {
 
 /// The ways a glob may name `path`: as shown, and with the trailing folders of the scan `root` in
 /// front (`public/models/a.glb` and `repo/public/models/a.glb` for root `/home/me/repo/public`).
-fn spellings(root: &str, path: &str) -> Vec<String> {
+pub(crate) fn spellings(root: &str, path: &str) -> Vec<String> {
     let folders: Vec<&str> = root
         .split('/')
         .filter(|c| !c.is_empty() && *c != ".")

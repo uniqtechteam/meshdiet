@@ -71,6 +71,7 @@ fn finding(
         message,
         why: advice.why.to_owned(),
         fix: advice.fix.to_owned(),
+        fingerprint: String::new(),
     }
 }
 

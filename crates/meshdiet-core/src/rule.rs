@@ -64,6 +64,7 @@ pub fn catalogue() -> Vec<&'static RuleInfo> {
     list.push(&GLTF_001);
     list.extend(crate::rules::size::BUILD_RULES);
     list.push(&load::LOAD_001);
+    list.extend([&crate::config::CFG_IGN, &crate::baseline::BASE_GROW]);
     list.sort_by_key(|i| i.id);
     list
 }

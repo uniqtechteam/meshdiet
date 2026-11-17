@@ -86,4 +86,8 @@ pub struct Finding {
     pub why: String,
     /// One sentence: how to fix it.
     pub fix: String,
+    /// Stable id of this finding across scans: rule, path, what was measured and the size class of
+    /// the value. Filled in by the scan; empty while a rule builds the finding.
+    #[serde(default)]
+    pub fingerprint: String,
 }

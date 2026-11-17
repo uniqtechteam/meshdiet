@@ -32,6 +32,50 @@ build_max = "20 MB"   # SIZE-002, off unless set
 Sizes are decimal (1 MB = 1,000,000 bytes). `--gzip` adds a gzip -6 transfer estimate per file; your
 server may use brotli or nothing, so treat it as a rough guide.
 
+The same file sets the gate, what to scan and what to leave out. Unknown keys and rule ids are an
+error, so a typo never switches a check off quietly:
+
+```toml
+fail_on = "high"            # high | medium | low | never; --fail-on wins
+paths = ["public", "dist"]  # scanned when no PATH is given
+
+ignore = [
+  "**/fixtures/**",          # never scanned
+  { rule = "TEX-001", path = "public/models/hero/*.glb", reason = "hero shot, shown full screen" },
+]
+
+[rules]
+skip = ["TEX-002"]
+```
+
+An ignored finding needs a reason; an entry without one still applies but is reported as a low
+`CFG-IGN` finding. `--show-ignored` lists what the entries keep out. `--rules` and `--skip` pick rules
+for one run. `meshdiet rules` lists every rule, and `meshdiet explain MESH-001` says why one matters,
+how to fix it with gltfpack or glTF Transform, and what the loader needs afterwards.
+
+### On a site that is already heavy
+
+Record where you are today, commit the file, and let CI fail only when something new appears or a
+model grows by more than 1%:
+
+```console
+$ meshdiet scan tests/fixtures/demo-site --write-baseline meshdiet-baseline.json --quiet
+meshdiet: wrote 7 findings and 4 files to meshdiet-baseline.json
+4 files · 5.6 MB · 1 uncompressed (5.1 MB) · 2 high · 4 medium · 1 low · scanned in 0.00s
+$ meshdiet scan tests/fixtures/demo-site --baseline meshdiet-baseline.json --quiet
+4 files · 5.6 MB · 1 uncompressed (5.1 MB) · 0 high · 0 medium · 0 low · 7 in baseline · scanned in 0.00s
+```
+
+A file that grew past `--tolerance` (1% by default) is reported as `BASE-GROW`, and so is a build that
+grew because of new files. Removed and smaller files are listed as improvements.
+
+### Output for CI
+
+`--format sarif` writes SARIF 2.1.0 for GitHub code scanning (each result points at the model file,
+with the measured numbers in its properties and a stable fingerprint). `--format markdown` writes the
+summary, findings, weight table and pages for a job summary or a pull request comment, for example
+`meshdiet scan public --format markdown >> "$GITHUB_STEP_SUMMARY"`. `--format json` is for scripts.
+
 ### Decoders
 
 A model compressed with Draco, meshopt or KTX2 only loads when the app sets up the matching decoder

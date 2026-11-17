@@ -164,6 +164,7 @@ fn finding(
         message: text.message,
         why: text.why.to_owned(),
         fix: text.fix,
+        fingerprint: String::new(),
     }
 }
 
