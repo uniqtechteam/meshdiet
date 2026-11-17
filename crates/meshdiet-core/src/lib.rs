@@ -8,6 +8,7 @@
 pub mod asset;
 mod config;
 mod finding;
+pub mod fix;
 pub mod glb;
 pub mod gltf;
 pub mod images;
