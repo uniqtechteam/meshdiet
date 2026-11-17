@@ -150,6 +150,8 @@ fn scan(args: &ScanArgs) -> Result<ExitCode, String> {
         progress: args.verbose.then_some(progress as fn(&str)),
         gzip: args.gzip,
         src: args.src.clone(),
+        only: Vec::new(),
+        skip: Vec::new(),
     };
     let report = meshdiet_core::scan(&args.paths, &options)?;
     for err in &report.internal_errors {

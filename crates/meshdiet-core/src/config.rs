@@ -1,14 +1,25 @@
-//! Limits the rules compare against, with defaults from ADR-008.
+//! `meshdiet.toml` (ADR-008): the gate, what to scan, what to leave out, and the limits the rules
+//! compare against, with defaults from ADR-008.
 //!
-//! `meshdiet.toml` is read here for the `[budgets]` and `[pages]` tables (SPEC-WEIGHT-001). The other
-//! ADR-008 keys (`fail_on`, `paths`, `ignore`, `[rules]`) are accepted but not used yet: they come with
-//! TASK-CLI-002. Any other key is an error, so a typo never silently drops a budget.
+//! Any key not in ADR-008 is an error, and so is an unknown rule id or a bad size (SPEC-CLI-001
+//! VAL-001), so a typo never silently drops a budget or an ignore.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
+use crate::rule::{self, RuleInfo};
+use crate::{Confidence, FailOn, Severity};
+
+/// CFG-IGN: an `ignore` entry with no reason (SPEC-CLI-001 VAL-002). Not one of the asset rules.
+pub const CFG_IGN: RuleInfo = RuleInfo {
+    id: "CFG-IGN",
+    title: "Ignore without a reason",
+    severity: Severity::Low,
+    confidence: Confidence::High,
+    summary: "an [[ignore]] entry in meshdiet.toml has no reason, so nobody can tell later whether it still holds",
+};
 /// Budgets and limits, in bytes, pixels or triangles. 1 MB = 1,000,000 bytes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Config {
@@ -28,6 +39,27 @@ pub struct Config {
     pub pages: Vec<PageGroup>,
     /// The `meshdiet.toml` these values came from, if any. Budget findings point at it.
     pub source: Option<PathBuf>,
+    /// `fail_on`: the gate when `--fail-on` is not given.
+    pub fail_on: Option<FailOn>,
+    /// `paths`: what to scan when no path is given, relative to the config file.
+    pub paths: Vec<PathBuf>,
+    /// Plain globs in `ignore`: files never scanned, for example `**/fixtures/**`.
+    pub ignore_paths: Vec<String>,
+    /// Table entries in `ignore`: findings of one rule on matching files, kept out of the result.
+    pub ignores: Vec<Ignore>,
+    /// `[rules] skip`: rule ids that never run, in canonical spelling.
+    pub skip: Vec<String>,
+}
+
+/// One `{ rule = "TEX-001", path = "public/hero/*.glb", reason = "…" }` entry.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Ignore {
+    /// Rule id, canonical spelling.
+    pub rule: String,
+    /// Glob over asset paths; `**` (every file) when the entry has no `path`.
+    pub path: String,
+    /// Why this is accepted. An entry without one still applies but is reported as CFG-IGN.
+    pub reason: Option<String>,
 }
 
 impl Default for Config {
@@ -41,6 +73,11 @@ impl Default for Config {
             compress_min: 64_000,
             pages: Vec::new(),
             source: None,
+            fail_on: None,
+            paths: Vec::new(),
+            ignore_paths: Vec::new(),
+            ignores: Vec::new(),
+            skip: Vec::new(),
         }
     }
 }
@@ -118,15 +155,93 @@ struct File {
     budgets: Budgets,
     #[serde(default)]
     pages: BTreeMap<String, Page>,
-    // Read by TASK-CLI-002; accepted now so a full ADR-008 file does not fail.
-    #[serde(rename = "fail_on")]
-    _fail_on: Option<toml::Value>,
-    #[serde(rename = "paths")]
-    _paths: Option<toml::Value>,
-    #[serde(rename = "ignore")]
-    _ignore: Option<toml::Value>,
-    #[serde(rename = "rules")]
-    _rules: Option<toml::Value>,
+    fail_on: Option<String>,
+    #[serde(default)]
+    paths: Vec<String>,
+    // Plain strings and tables mixed, so read by hand for clear errors.
+    #[serde(default)]
+    ignore: Vec<toml::Value>,
+    #[serde(default)]
+    rules: Rules,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(deny_unknown_fields)]
+struct Rules {
+    #[serde(default)]
+    skip: Vec<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct IgnoreEntry {
+    rule: String,
+    path: Option<String>,
+    reason: Option<String>,
+}
+
+/// The canonical spelling of a rule id, or an error listing every valid id.
+///
+/// # Errors
+/// When no rule has this id.
+pub fn rule_id(id: &str, place: &str) -> Result<&'static str, String> {
+    rule::find(id.trim()).map(|i| i.id).ok_or_else(|| {
+        let known: Vec<&str> = rule::catalogue().iter().map(|i| i.id).collect();
+        format!(
+            "{place}: unknown rule `{id}`; valid rules: {}",
+            known.join(", ")
+        )
+    })
+}
+
+/// `high`, `medium`, `low` or `never`.
+///
+/// # Errors
+/// Any other word, with the valid ones.
+pub fn parse_fail_on(text: &str) -> Result<FailOn, String> {
+    match text.trim().to_ascii_lowercase().as_str() {
+        "high" => Ok(FailOn::AtLeast(Severity::High)),
+        "medium" => Ok(FailOn::AtLeast(Severity::Medium)),
+        "low" => Ok(FailOn::AtLeast(Severity::Low)),
+        "never" => Ok(FailOn::Never),
+        _ => Err(format!(
+            "fail_on = \"{text}\": use high, medium, low or never"
+        )),
+    }
+}
+
+fn read_ignores(entries: Vec<toml::Value>, config: &mut Config) -> Result<(), String> {
+    for (n, value) in entries.into_iter().enumerate() {
+        let place = format!("ignore[{n}]");
+        match value {
+            toml::Value::String(glob) => {
+                crate::weight::glob(&glob)
+                    .map_err(|e| format!("{place}: bad glob `{glob}`: {e}"))?;
+                config.ignore_paths.push(glob);
+            }
+            toml::Value::Table(_) => {
+                let entry: IgnoreEntry = value
+                    .try_into()
+                    .map_err(|e: toml::de::Error| format!("{place}: {}", e.to_string().trim()))?;
+                let rule = rule_id(&entry.rule, &place)?.to_owned();
+                let path = entry.path.unwrap_or_else(|| "**".to_owned());
+                crate::weight::glob(&path)
+                    .map_err(|e| format!("{place}: bad glob `{path}`: {e}"))?;
+                let reason = entry
+                    .reason
+                    .map(|r| r.trim().to_owned())
+                    .filter(|r| !r.is_empty());
+                config.ignores.push(Ignore { rule, path, reason });
+            }
+            other => {
+                return Err(format!(
+                    "{place}: expected a glob such as \"**/fixtures/**\" or a table such as {{ rule = \"TEX-001\", path = \"public/hero/*.glb\", reason = \"...\" }}, found {}",
+                    other.type_str()
+                ));
+            }
+        }
+    }
+    Ok(())
 }
 
 #[derive(Deserialize, Default)]
@@ -174,6 +289,14 @@ impl Config {
         if let Some(s) = &b.compress_min {
             config.compress_min = s.bytes("budgets.compress_min")?;
         }
+        if let Some(word) = &file.fail_on {
+            config.fail_on = Some(parse_fail_on(word)?);
+        }
+        config.paths = file.paths.iter().map(PathBuf::from).collect();
+        for id in &file.rules.skip {
+            config.skip.push(rule_id(id, "rules.skip")?.to_owned());
+        }
+        read_ignores(file.ignore, &mut config)?;
         for (name, page) in file.pages {
             if page.assets.is_empty() {
                 return Err(format!("pages.\"{name}\" has no assets globs"));
@@ -203,6 +326,14 @@ impl Config {
         let text = std::fs::read_to_string(path)
             .map_err(|e| format!("cannot read {}: {e}", path.display()))?;
         let mut config = Self::from_toml(&text).map_err(|e| format!("{}: {e}", path.display()))?;
+        // `paths` are written relative to the file, wherever meshdiet runs from.
+        if let Some(dir) = path.parent().filter(|d| !d.as_os_str().is_empty()) {
+            for p in &mut config.paths {
+                if p.is_relative() {
+                    *p = dir.join(&*p);
+                }
+            }
+        }
         config.source = Some(path.to_path_buf());
         Ok(config)
     }
@@ -257,5 +388,48 @@ compress_min = 1000
         assert!(Config::from_toml("[budgets]\nbuild_max = \"5 MiB\"").is_err());
         assert!(Config::from_toml("[pages]\n\"/\" = { assets = [\"[\"] }").is_err());
         assert!(Config::from_toml("colour = true").is_err());
+        assert!(Config::from_toml("[rules]\nonly = [\"MESH-001\"]").is_err());
+        assert!(Config::from_toml("ignore = [{ rule = \"TEX-001\", pth = \"a\" }]").is_err());
+    }
+
+    #[test]
+    fn every_adr_008_key_is_read() {
+        let c = Config::from_toml(
+            r#"
+fail_on = "medium"
+paths = ["public", "dist"]
+ignore = [
+  "**/fixtures/**",
+  { rule = "tex-001", path = "public/hero/*.glb", reason = "hero shot, zoomed in" },
+  { rule = "MESH-003" },
+]
+[rules]
+skip = ["TEX-002"]
+"#,
+        )
+        .unwrap();
+        assert_eq!(c.fail_on, Some(FailOn::AtLeast(Severity::Medium)));
+        assert_eq!(c.paths, [PathBuf::from("public"), PathBuf::from("dist")]);
+        assert_eq!(c.ignore_paths, ["**/fixtures/**"]);
+        assert_eq!(c.skip, ["TEX-002"]);
+        assert_eq!(c.ignores.len(), 2);
+        assert_eq!(c.ignores[0].rule, "TEX-001");
+        assert_eq!(c.ignores[0].reason.as_deref(), Some("hero shot, zoomed in"));
+        assert_eq!(c.ignores[1].path, "**");
+        assert_eq!(c.ignores[1].reason, None);
+    }
+
+    #[test]
+    fn unknown_rules_and_words_list_the_choices() {
+        let e = Config::from_toml("[rules]\nskip = [\"TEX-009\"]").unwrap_err();
+        assert!(
+            e.contains("unknown rule `TEX-009`") && e.contains("MESH-001"),
+            "{e}"
+        );
+        let e = Config::from_toml("fail_on = \"critical\"").unwrap_err();
+        assert!(e.contains("high, medium, low or never"), "{e}");
+        let e = Config::from_toml("ignore = [{ rule = \"NOPE-1\", reason = \"x\" }]").unwrap_err();
+        assert!(e.contains("ignore[0]") && e.contains("valid rules"), "{e}");
+        assert!(Config::from_toml("ignore = [3]").is_err());
     }
 }

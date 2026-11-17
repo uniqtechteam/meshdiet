@@ -8,12 +8,14 @@ use std::time::{Duration, Instant};
 
 use serde::Serialize;
 
+use crate::baseline::{BaselineDiff, fingerprint};
+use crate::config::CFG_IGN;
 use crate::rule::{self, GLTF_001, Rule};
 use crate::rules::load;
 use crate::rules::size;
 use crate::source_index::SourceIndex;
 use crate::weight::{self, PageTotal, Totals};
-use crate::{Asset, Confidence, Config, Finding, Measured, Severity, asset, walk};
+use crate::{Asset, Confidence, Config, Finding, Ignore, Measured, Severity, asset, walk};
 
 /// Version of the JSON report shape. Bumped only on breaking changes.
 pub const SCHEMA: u32 = 1;
@@ -29,6 +31,43 @@ pub struct Options {
     pub gzip: bool,
     /// Where the app's JS/TS/HTML sources are, for LOAD-001 (`--src`); the scan root when `None`.
     pub src: Option<PathBuf>,
+    /// Run only these rules (`--rules`); every rule when empty. CFG findings always run.
+    pub only: Vec<String>,
+    /// Never run these rules (`--skip`), on top of `[rules] skip` in the config.
+    pub skip: Vec<String>,
+}
+
+impl Options {
+    /// Check `only` and `skip` against the rule list (ids are not case-sensitive).
+    ///
+    /// # Errors
+    /// An unknown rule id, with every valid one.
+    pub fn validate(&self) -> Result<(), String> {
+        for (list, flag) in [(&self.only, "--rules"), (&self.skip, "--skip")] {
+            for id in list {
+                crate::config::rule_id(id, flag)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Whether findings of rule `id` are reported.
+    #[must_use]
+    pub fn runs(&self, id: &str) -> bool {
+        let listed = |list: &[String]| list.iter().any(|x| x.eq_ignore_ascii_case(id));
+        (self.only.is_empty() || listed(&self.only) || id.starts_with("CFG-"))
+            && !listed(&self.skip)
+            && !listed(&self.config.skip)
+    }
+}
+
+/// A finding kept out of the result by an `ignore` entry in `meshdiet.toml`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Ignored {
+    /// The finding.
+    pub finding: Finding,
+    /// The entry's reason; `None` when it has none (also reported as CFG-IGN).
+    pub reason: Option<String>,
 }
 
 /// Counts per severity.
@@ -40,6 +79,22 @@ pub struct Summary {
     pub medium: usize,
     /// Low findings.
     pub low: usize,
+}
+
+impl Summary {
+    /// Count `findings` by severity.
+    #[must_use]
+    pub fn of(findings: &[Finding]) -> Self {
+        let mut summary = Self::default();
+        for f in findings {
+            match f.severity {
+                Severity::High => summary.high += 1,
+                Severity::Medium => summary.medium += 1,
+                Severity::Low => summary.low += 1,
+            }
+        }
+        summary
+    }
 }
 
 /// Everything a scan produced.
@@ -70,6 +125,12 @@ pub struct Report {
     /// Rules that crashed (the scan carried on without them).
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub internal_errors: Vec<String>,
+    /// Findings kept out by `ignore` entries in `meshdiet.toml`, with their reasons.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub ignored: Vec<Ignored>,
+    /// How this scan compares with `--baseline`, when one was given.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub baseline: Option<BaselineDiff>,
 }
 
 /// When a scan should fail the build.
@@ -82,6 +143,17 @@ pub enum FailOn {
 }
 
 impl Report {
+    /// Most severe first, then by path and rule.
+    pub fn sort_findings(&mut self) {
+        self.findings.sort_by(|a, b| {
+            b.severity
+                .cmp(&a.severity)
+                .then_with(|| a.path.cmp(&b.path))
+                .then_with(|| a.rule.cmp(&b.rule))
+                .then_with(|| b.measured.value.cmp(&a.measured.value))
+        });
+    }
+
     /// The scan's wall time.
     #[must_use]
     pub fn duration(&self) -> Duration {
@@ -113,6 +185,7 @@ fn unreadable(asset: &Asset, problem: &str) -> Finding {
         message: problem.to_owned(),
         why: "Loaders stop at the first broken part, so this model, or a part of it, never shows up on the page.".to_owned(),
         fix: "Export the model again (one .glb cannot lose its files), and check it with the Khronos glTF Validator (https://github.khronos.org/glTF-Validator/) for the exact error.".to_owned(),
+        fingerprint: String::new(),
     }
 }
 
@@ -163,18 +236,21 @@ pub fn scan_with(
     options: &Options,
 ) -> Result<Report, String> {
     let started = Instant::now();
+    options.validate()?;
     let walked = walk::walk(paths)?;
+    let root_shown = walked.root.to_string_lossy().replace('\\', "/");
+    let skipped = Ignores::new(&options.config, &root_shown);
     let mut assets = Vec::with_capacity(walked.files.len());
     let mut findings = Vec::new();
     let mut internal_errors = Vec::new();
-    for file in &walked.files {
+    for file in walked.files.iter().filter(|f| !skipped.skips_file(&f.rel)) {
         if let Some(progress) = options.progress {
             progress(&file.rel);
         }
         let asset = asset::read(&file.rel, &file.abs);
         findings.extend(asset.problems.iter().map(|p| unreadable(&asset, p)));
         if asset.document.is_some() {
-            for rule in rules {
+            for rule in rules.iter().filter(|r| options.runs(r.id())) {
                 match catch_unwind(AssertUnwindSafe(|| rule.check(&asset, &options.config))) {
                     Ok(found) => findings.extend(found),
                     Err(_) => internal_errors.push(format!(
@@ -187,7 +263,6 @@ pub fn scan_with(
         }
         assets.push(asset);
     }
-    let root_shown = walked.root.to_string_lossy().replace('\\', "/");
     let weighed = weigh(&assets, &walked.root, &root_shown, options);
     let config_path = options.config.source.as_deref().map_or_else(
         || "meshdiet.toml".to_owned(),
@@ -200,25 +275,17 @@ pub fn scan_with(
         &options.config,
         &config_path,
     ));
-    if assets.iter().any(load::needs_decoder) {
+    if options.runs(load::LOAD_001.id) && assets.iter().any(load::needs_decoder) {
         let src: &Path = options.src.as_deref().unwrap_or(&walked.root);
         findings.extend(load::check(&assets, &SourceIndex::build(src)));
     }
-    findings.sort_by(|a, b| {
-        b.severity
-            .cmp(&a.severity)
-            .then_with(|| a.path.cmp(&b.path))
-            .then_with(|| a.rule.cmp(&b.rule))
-    });
-    let mut summary = Summary::default();
-    for f in &findings {
-        match f.severity {
-            Severity::High => summary.high += 1,
-            Severity::Medium => summary.medium += 1,
-            Severity::Low => summary.low += 1,
-        }
+    findings.extend(no_reason(&options.config, &config_path));
+    findings.retain(|f| options.runs(&f.rule));
+    for f in &mut findings {
+        f.fingerprint = fingerprint(f);
     }
-    Ok(Report {
+    let (findings, ignored) = skipped.split(findings);
+    let mut report = Report {
         schema: SCHEMA,
         version: crate::VERSION,
         root: root_shown,
@@ -227,10 +294,100 @@ pub fn scan_with(
         pages: weighed.pages.totals,
         gzip_estimate: weighed.gzip,
         assets,
+        summary: Summary::of(&findings),
         findings,
-        summary,
         internal_errors,
-    })
+        ignored,
+        baseline: None,
+    };
+    report.sort_findings();
+    Ok(report)
+}
+
+/// CFG-IGN (VAL-002): one low finding per `ignore` entry with no reason. The entry still applies.
+fn no_reason(config: &Config, config_path: &str) -> Vec<Finding> {
+    config
+        .ignores
+        .iter()
+        .enumerate()
+        .filter(|(_, i)| i.reason.is_none())
+        .map(|(n, i)| Finding {
+            rule: CFG_IGN.id.to_owned(),
+            title: CFG_IGN.title.to_owned(),
+            severity: CFG_IGN.severity,
+            confidence: CFG_IGN.confidence,
+            path: config_path.to_owned(),
+            measured: Measured::exact("ignore entry", n as u64, "index"),
+            threshold: None,
+            message: format!(
+                "ignore[{n}] silences {} on `{}` without a reason",
+                i.rule, i.path
+            ),
+            why: "An ignore outlives the reason it was added for; without the reason written down, nobody can tell later whether it still holds.".to_owned(),
+            fix: format!(
+                "Add reason = \"...\" to the entry, for example {{ rule = \"{}\", path = \"{}\", reason = \"hero model, shown full screen\" }}.",
+                i.rule, i.path
+            ),
+            fingerprint: String::new(),
+        })
+        .collect()
+}
+
+/// The config's `ignore` entries, compiled once per scan.
+struct Ignores<'a> {
+    root: &'a str,
+    files: Vec<globset::GlobMatcher>,
+    findings: Vec<(&'a Ignore, globset::GlobMatcher)>,
+}
+
+impl<'a> Ignores<'a> {
+    fn new(config: &'a Config, root: &'a str) -> Self {
+        // Globs were checked when the config was read; one that fails here is dropped.
+        Self {
+            root,
+            files: config
+                .ignore_paths
+                .iter()
+                .filter_map(|g| weight::glob(g).ok())
+                .collect(),
+            findings: config
+                .ignores
+                .iter()
+                .filter_map(|i| weight::glob(&i.path).ok().map(|m| (i, m)))
+                .collect(),
+        }
+    }
+
+    fn matches(&self, m: &globset::GlobMatcher, path: &str) -> bool {
+        weight::spellings(self.root, path)
+            .iter()
+            .any(|p| m.is_match(p))
+    }
+
+    /// A plain glob in `ignore` names this file: it is not scanned at all.
+    fn skips_file(&self, path: &str) -> bool {
+        self.files.iter().any(|m| self.matches(m, path))
+    }
+
+    /// Move findings that an `ignore` entry covers out of the result.
+    fn split(&self, findings: Vec<Finding>) -> (Vec<Finding>, Vec<Ignored>) {
+        let mut kept = Vec::with_capacity(findings.len());
+        let mut ignored = Vec::new();
+        for f in findings {
+            match self
+                .findings
+                .iter()
+                .find(|(i, m)| i.rule == f.rule && self.matches(m, &f.path))
+            {
+                Some((i, _)) => ignored.push(Ignored {
+                    finding: f,
+                    reason: i.reason.clone(),
+                }),
+                None => kept.push(f),
+            }
+        }
+        (kept, ignored)
+    }
 }
 
 #[cfg(test)]
@@ -258,9 +415,12 @@ mod tests {
                 message: "m".into(),
                 why: "w".into(),
                 fix: "f".into(),
+                fingerprint: String::new(),
             }],
             summary: Summary::default(),
             internal_errors: Vec::new(),
+            ignored: Vec::new(),
+            baseline: None,
         }
     }
 

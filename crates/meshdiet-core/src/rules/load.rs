@@ -136,6 +136,7 @@ pub fn check(assets: &[Asset], sources: &SourceIndex) -> Vec<Finding> {
             ),
             why: t.why.to_owned(),
             fix: t.fix.to_owned(),
+            fingerprint: String::new(),
         });
     }
     out
