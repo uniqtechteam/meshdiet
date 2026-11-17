@@ -2,6 +2,7 @@
 
 use serde::Serialize;
 
+use crate::rules::mesh;
 use crate::{Asset, Confidence, Config, Finding, Severity};
 
 /// What a rule is, for `meshdiet rules`, `meshdiet explain` and SARIF.
@@ -44,7 +45,11 @@ pub const GLTF_001: RuleInfo = RuleInfo {
 /// Every rule, in the order they run. The asset rules arrive with TASK-RULE-001…003.
 #[must_use]
 pub fn all() -> Vec<Box<dyn Rule>> {
-    Vec::new()
+    vec![
+        Box::new(mesh::UncompressedGeometry),
+        Box::new(mesh::TriangleBudget),
+        Box::new(mesh::UnusedBufferBytes),
+    ]
 }
 
 /// Info for every rule the engine reports, in id order.
