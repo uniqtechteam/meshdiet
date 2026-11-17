@@ -53,6 +53,26 @@ $ meshdiet fix public/models --dry-run        # see what you would save
 $ meshdiet fix public/models --out public/models-opt
 ```
 
+What happens to each model (`docs/diagrams/fix.mmd`):
+
+```mermaid
+stateDiagram-v2
+    [*] --> skipped: unreadable, Draco, already compressed, no finding
+    [*] --> gltfpack: flagged by a MESH or TEX rule
+    gltfpack --> gltfpack_failed: non-zero exit
+    gltfpack --> verify: output written
+    verify --> verify_failed: lost a scene, name, parent or extras
+    verify --> not_improved: not smaller
+    verify --> fixed: same structure, smaller
+    fixed --> [*]: output kept
+    skipped --> [*]: original kept
+    gltfpack_failed --> [*]: original kept
+    verify_failed --> [*]: original kept
+    not_improved --> [*]: original kept
+```
+
+Only `fixed` replaces anything; every other path keeps the original.
+
 The sizes it prints are measured on disk after the fact, never estimated. Your loader then needs
 `setMeshoptDecoder`; the report prints the three.js lines.
 
