@@ -2,7 +2,7 @@
 
 use serde::Serialize;
 
-use crate::rules::mesh;
+use crate::rules::{file, mesh};
 use crate::{Asset, Confidence, Config, Finding, Severity};
 
 /// What a rule is, for `meshdiet rules`, `meshdiet explain` and SARIF.
@@ -49,6 +49,7 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(mesh::UncompressedGeometry),
         Box::new(mesh::TriangleBudget),
         Box::new(mesh::UnusedBufferBytes),
+        Box::new(file::EmbeddedData),
     ];
     rules.extend(crate::rules::texture::rules());
     rules.push(Box::new(crate::rules::size::FileOverBudget));
