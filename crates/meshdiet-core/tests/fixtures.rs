@@ -55,15 +55,30 @@ fn is_rule_id(name: &str) -> bool {
     })
 }
 
-/// The rules the engine runs today. None yet: the reader and rules arrive with TASK-CLI-001 and the
-/// RULE tasks, and each one switches its fixtures from shape-only to full checks.
+/// The rules the engine runs today; other rule folders are checked for shape only.
 fn engine_rules() -> Vec<&'static str> {
-    Vec::new()
+    meshdiet_core::rule::catalogue()
+        .iter()
+        .map(|i| i.id)
+        .collect()
 }
 
 /// Findings the engine reports for `dir`, as (rule, path, value).
-fn engine_findings(_dir: &Path) -> Vec<Expected> {
-    Vec::new()
+fn engine_findings(dir: &Path) -> Vec<Expected> {
+    meshdiet_core::scan(&[dir.to_path_buf()], &meshdiet_core::Options::default())
+        .unwrap_or_else(|e| panic!("{}: {e}", dir.display()))
+        .findings
+        .into_iter()
+        .map(|f| Expected {
+            rule: f.rule,
+            path: f.path,
+            #[allow(
+                clippy::cast_precision_loss,
+                reason = "fixture values are far below 2^52"
+            )]
+            value: Some(f.measured.value as f64),
+        })
+        .collect()
 }
 
 fn read_expected(bad: &Path) -> Vec<Expected> {
@@ -104,14 +119,14 @@ fn fixtures_harness_walks_every_folder() {
             .into_iter()
             .filter(|f| &f.rule == rule)
             .collect();
+        expected.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        got.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
         // a fixture that pins no value accepts any measured value
         for (g, e) in got.iter_mut().zip(&expected) {
             if e.value.is_none() {
                 g.value = None;
             }
         }
-        expected.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-        got.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
         assert_eq!(got, expected, "fixture {}", bad.display());
         let hits: Vec<Expected> = engine_findings(&good)
             .into_iter()
@@ -123,6 +138,30 @@ fn fixtures_harness_walks_every_folder() {
             good.display()
         );
     }
+}
+
+/// Only the deliberately broken files may be unreadable: every other fixture, including the files
+/// made by gltfpack and glTF Transform, must read cleanly.
+#[test]
+fn every_other_fixture_reads_cleanly() {
+    let root = fixtures_root();
+    let report = meshdiet_core::scan(
+        std::slice::from_ref(&root),
+        &meshdiet_core::Options::default(),
+    )
+    .unwrap_or_else(|e| panic!("{e}"));
+    assert!(
+        report.assets.len() > 30,
+        "only {} assets",
+        report.assets.len()
+    );
+    let stray: Vec<String> = report
+        .findings
+        .iter()
+        .filter(|f| f.rule == "GLTF-001" && !f.path.starts_with("GLTF-001/bad/"))
+        .map(|f| format!("{}: {}", f.path, f.message))
+        .collect();
+    assert!(stray.is_empty(), "unexpected GLTF-001: {stray:#?}");
 }
 
 #[test]
