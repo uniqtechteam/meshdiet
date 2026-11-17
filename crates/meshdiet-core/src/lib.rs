@@ -14,6 +14,7 @@ pub mod images;
 mod report;
 pub mod rule;
 pub mod rules;
+pub mod source_index;
 pub mod walk;
 pub mod weight;
 
@@ -21,6 +22,7 @@ pub use asset::{Asset, AssetKind, Compression, Estimate, ImageInfo, ImageSource}
 pub use config::{Config, PageGroup};
 pub use finding::{Confidence, Finding, Measured, Severity};
 pub use report::{FailOn, Options, Report, SCHEMA, Summary, scan, scan_with};
+pub use source_index::{Decoder, SourceIndex};
 pub use weight::{PageTotal, Totals};
 
 /// Version of the engine, shown by `meshdiet --version`.
