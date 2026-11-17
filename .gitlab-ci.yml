@@ -24,8 +24,16 @@ lint:
     - cargo fmt --all --check
     - cargo clippy --workspace --all-targets -- -D warnings
 
+# The fix tests run the real gltfpack: the pinned release zip from tests/fixtures/README.md,
+# checked against its SHA-256 before use.
 test:
+  variables:
+    MESHDIET_TEST_GLTFPACK: /usr/local/bin/gltfpack
   script:
+    - curl -sSfL -o /tmp/gltfpack.zip https://github.com/zeux/meshoptimizer/releases/download/v1.3/gltfpack-ubuntu.zip
+    - echo "0666d9dc40d60fe5b9a45f3fc24f8e6ca87112974bd5de9ca57152aa13d06017  /tmp/gltfpack.zip" | sha256sum -c -
+    - command -v unzip || (apt-get update -qq && apt-get install -y -qq unzip)
+    - unzip -o /tmp/gltfpack.zip gltfpack -d /usr/local/bin && chmod +x /usr/local/bin/gltfpack
     - cargo test --workspace
 
 # The oldest Rust we promise to build on (rust-version in Cargo.toml).

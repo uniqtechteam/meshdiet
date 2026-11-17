@@ -41,6 +41,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   fails a build only with `--strict`.
 - Readable output grouped by file with a summary line, or `--format json` (schema 1) for scripts;
   `--output FILE`, `--quiet`, `--verbose`, and no colour when piped or when `NO_COLOR` is set.
+- `meshdiet fix [PATH...]` compresses the models with MESH-001 or TEX findings by running gltfpack
+  1.3 or newer (found through `--gltfpack`, `MESHDIET_GLTFPACK` or `PATH`; meshdiet never downloads
+  it and says how to install it when it is missing). Geometry gets meshopt (`-cc`), textures WebP by
+  default (`--textures ktx2|keep`, `--max-texture`), and gltfpack always runs with `-kn -km -ke` and
+  never simplifies, so named nodes, named materials and their extras survive. Every output is read
+  back and kept only when it has the same scenes, the same named nodes under the same named parents,
+  the same named materials and extras, and is smaller. Results go to `meshdiet-out/` (or `--out`),
+  `--in-place` only replaces files git has a clean copy of (or with `--force`), and `--dry-run`
+  writes nothing. The report shows sizes measured on disk and the three.js decoder lines the app
+  needs. `scan --fix` runs `fix` after the scan.
 - Exit codes for CI: 0 when nothing reaches `--fail-on` (high by default), 1 when something does, 2 for
   usage errors. Medium-confidence findings count only with `--strict`.
 - A weight table after the findings: every asset with its total, geometry, textures, compression and

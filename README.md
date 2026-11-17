@@ -7,7 +7,8 @@ Draco or meshopt compression, textures that are too big, and a total nobody adde
 It is early work. Today `meshdiet scan` reads every model under a folder (container, JSON, external
 files and image headers, nothing decoded), checks geometry, textures, embedded base64 data and size
 budgets, checks that your app sets up the decoders its compressed models need, and adds up what every
-model weighs. The first release will come with install steps.
+model weighs. `meshdiet fix` compresses the flagged models with gltfpack. The first release will come
+with install steps.
 
 ```console
 $ meshdiet scan tests/fixtures/GLTF-001/bad --quiet
@@ -38,6 +39,22 @@ in three.js. meshdiet searches the JS, TS and HTML in the scanned folder for tha
 `MeshoptDecoder`, `KTX2Loader`, drei `useGLTF`, `<model-viewer>`) and reports LOAD-001 when it is
 missing. If you scan only `public/`, point it at your code with `--src src`. It is a text search, so
 it is marked "check by hand" and fails a build only with `--strict`; Babylon.js apps are skipped.
+
+### Fixing what it finds
+
+`meshdiet fix` hands the flagged models to [gltfpack](https://github.com/zeux/meshoptimizer/tree/master/gltf)
+(meshoptimizer, MIT), which you install yourself: one file from the
+[release page](https://github.com/zeux/meshoptimizer/releases). meshdiet runs it with flags that keep
+your named nodes, named materials and extras, never simplifies a mesh, reads every output back, and
+keeps the original whenever the output lost a name or did not get smaller.
+
+```console
+$ meshdiet fix public/models --dry-run        # see what you would save
+$ meshdiet fix public/models --out public/models-opt
+```
+
+The sizes it prints are measured on disk after the fact, never estimated. Your loader then needs
+`setMeshoptDecoder`; the report prints the three.js lines.
 
 ## Licence
 
