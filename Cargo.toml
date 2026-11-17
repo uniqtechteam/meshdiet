@@ -23,6 +23,11 @@ base64 = "0.22"
 # Header-only image sizing: no pixel decoding (ADR-003).
 imagesize = { version = "0.15", default-features = false, features = ["png", "jpeg", "webp", "heif", "ktx2"] }
 ktx2 = "0.5"
+# meshdiet.toml budgets and page groups.
+toml = { version = "1", default-features = false, features = ["parse", "serde"] }
+globset = "0.4"
+# `--gzip` transfer estimate (pure Rust backend).
+flate2 = "1"
 xtask = { path = "xtask" }
 # Fixture textures only (xtask); the scanner never decodes images.
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }

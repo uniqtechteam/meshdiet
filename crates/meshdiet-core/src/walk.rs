@@ -32,7 +32,7 @@ fn is_asset(path: &Path) -> bool {
 }
 
 /// `path` relative to `root` with forward slashes, or `path` as given when it is elsewhere.
-fn relative(root: &Path, path: &Path) -> String {
+pub(crate) fn relative(root: &Path, path: &Path) -> String {
     let shown = path.strip_prefix(root).unwrap_or(path);
     let parts: Vec<String> = shown
         .components()
