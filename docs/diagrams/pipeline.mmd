@@ -1,0 +1,12 @@
+flowchart LR
+    A["meshdiet scan public"] --> B["walk<br/>.glb and .gltf,<br/>respects .gitignore"]
+    B --> C["asset::read<br/>GLB container, glTF JSON,<br/>.bin sizes, image headers"]
+    C --> D{"13 rules<br/>MESH · TEX · GLTF ·<br/>SIZE · LOAD"}
+    C --> E["weight<br/>totals, pages,<br/>budgets"]
+    S["SourceIndex<br/>app JS, TS, HTML"] --> D
+    E --> D
+    D --> F["Report<br/>meshdiet.toml ignores,<br/>baseline"]
+    F --> G["pretty / JSON /<br/>Markdown / SARIF"]
+    F --> H["exit code<br/>by fail_on"]
+    F -. "meshdiet fix" .-> I["gltfpack<br/>-kn -km -ke -cc -tw -tl 2048"]
+    I --> J["verify<br/>read back, same structure,<br/>smaller on disk"]
