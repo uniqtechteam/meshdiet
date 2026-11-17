@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 use serde_json::Value;
+use xtask::gltf::Builder;
 
 fn run_in(dir: &Path, args: &[&str]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_meshdiet"))
@@ -42,37 +43,62 @@ fn story() -> tempfile::TempDir {
     dir
 }
 
+/// The weight table: the lines after its title, up to the blank line.
+fn table(out: &str) -> Vec<&str> {
+    out.lines()
+        .skip_while(|l| *l != "Weight, largest first")
+        .skip(2)
+        .take_while(|l| !l.is_empty())
+        .collect()
+}
+
 #[test]
 fn ac_001_37_uncompressed_models_49_8_mb() {
     let dir = story();
     let o = run(&["scan", path(&dir.path().join("models"))]);
     let out = stdout(&o);
-    assert_eq!(o.status.code(), Some(0), "{out}");
     assert!(
-        out.contains("37 files · 49.8 MB · 37 uncompressed (49.8 MB) · 0 high"),
+        out.contains("37 files · 49.8 MB · 37 uncompressed (49.8 MB) · 37 high"),
         "{out}"
     );
     // the 20 largest, then one line for the rest
-    let table: Vec<&str> = out.lines().filter(|l| l.contains("product-")).collect();
-    assert_eq!(table.len(), 20, "{out}");
-    assert!(table[0].starts_with("  product-37.glb"), "{out}");
+    let rows = table(&out);
+    assert_eq!(rows.len(), 21, "{out}");
+    assert!(rows[0].starts_with("  product-37.glb"), "{out}");
+    assert!(rows[0].contains("none"), "compression column: {out}");
     assert!(
-        out.contains("17 more files, ") && out.contains("(--all shows every row)"),
+        rows[20].starts_with("  17 more files, ") && rows[20].ends_with("(--all shows every row)"),
         "{out}"
     );
-    assert!(out.contains("file") && out.contains("geometry") && out.contains("GPU (est.)"));
-    assert!(out.contains("none"), "compression column: {out}");
+    assert!(out.contains("geometry") && out.contains("GPU (est.)"));
 
     let all = stdout(&run(&["scan", "--all", path(&dir.path().join("models"))]));
-    assert_eq!(all.lines().filter(|l| l.contains("product-")).count(), 37);
+    assert_eq!(table(&all).len(), 37);
     assert!(!all.contains("more files"));
 }
 
 #[test]
 fn ac_001_six_mb_glb_exits_1_with_one_high() {
-    let o = run(&["scan", path(&fixtures().join("SIZE-001/bad"))]);
+    // 6 MB that only the file budget catches: a small box and 6 MB of unused buffer (MESH-003, low)
+    let dir = tempfile::tempdir().unwrap();
+    let mut b = Builder::new();
+    let mesh = b.grid_mesh("box", 12, None);
+    b.node("box", mesh, 0.0);
+    b.dead_bytes(6_000_000);
+    fs::write(dir.path().join("big.glb"), b.glb()).unwrap();
+    let o = run(&["scan", path(dir.path())]);
     let out = stdout(&o);
     assert_eq!(o.status.code(), Some(1), "{out}");
+    assert!(
+        out.contains("SIZE-001  6.0 MB, over the 5.0 MB file budget"),
+        "{out}"
+    );
+    assert!(out.contains(" · 1 high · 0 medium · "), "{out}");
+}
+
+#[test]
+fn size_001_names_the_biggest_image() {
+    let out = stdout(&run(&["scan", path(&fixtures().join("SIZE-001/bad"))]));
     assert!(
         out.contains("SIZE-001  5.1 MB, over the 5.0 MB file budget"),
         "{out}"
@@ -81,7 +107,6 @@ fn ac_001_six_mb_glb_exits_1_with_one_high() {
         out.contains("Biggest image: hero-photo (1400x1400 JPEG, 3.8 MB)"),
         "{out}"
     );
-    assert!(out.contains("1 high"), "{out}");
 }
 
 #[test]
@@ -112,8 +137,13 @@ fn json_has_totals_and_pages() {
     assert_eq!(pages[1]["name"], "/shop");
     assert_eq!(pages[1]["max"], 2_000_000);
     assert_eq!(pages[1]["assets"].as_array().unwrap().len(), 2);
-    assert_eq!(r["findings"][0]["rule"], "SIZE-003");
-    assert_eq!(r["findings"][0]["path"], "meshdiet.toml");
+    let size = r["findings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|f| f["rule"] == "SIZE-003")
+        .unwrap();
+    assert_eq!(size["path"], "meshdiet.toml");
 }
 
 #[test]
@@ -169,7 +199,7 @@ fn config_in_the_current_folder_is_found() {
     )
     .unwrap();
     let o = run_in(dir.path(), &["scan", "public", "--config", "loose.toml"]);
-    assert_eq!(o.status.code(), Some(0), "{}", stdout(&o));
+    assert!(!stdout(&o).contains("SIZE-002"), "{}", stdout(&o));
     fs::write(
         dir.path().join("bad.toml"),
         "[budgets]\nbuild_max = \"3 MiB\"\n",
