@@ -1,0 +1,41 @@
+# CI on our own GitLab runner (Linux). GitHub Actions is off while the repo is private.
+
+default:
+  image: rust:1-bookworm
+  interruptible: true
+  before_script:
+    - rustup component add rustfmt clippy
+  cache:
+    key: cargo-$CI_JOB_NAME
+    paths: [.cargo/registry, .cargo/git, target/]
+
+variables:
+  CARGO_HOME: $CI_PROJECT_DIR/.cargo
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH
+
+lint:
+  script:
+    - cargo fmt --all --check
+    - cargo clippy --workspace --all-targets -- -D warnings
+
+test:
+  script:
+    - cargo test --workspace
+
+# The oldest Rust we promise to build on (rust-version in Cargo.toml).
+msrv:
+  image: rust:1.88-bookworm
+  before_script: []
+  script:
+    - cargo check --workspace --locked
+
+deny:
+  script:
+    - cargo install --locked cargo-deny
+    - cargo deny check
