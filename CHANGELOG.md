@@ -35,3 +35,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   `--output FILE`, `--quiet`, `--verbose`, and no colour when piped or when `NO_COLOR` is set.
 - Exit codes for CI: 0 when nothing reaches `--fail-on` (high by default), 1 when something does, 2 for
   usage errors. Medium-confidence findings count only with `--strict`.
+- A weight table after the findings: every asset with its total, geometry, textures, compression and
+  estimated GPU memory, largest first. The top 20 are shown; `--all` shows every row. Files shared by
+  several assets are marked `(shared)` and counted once in every total.
+- The summary line says how many models ship without geometry compression and what they weigh, for
+  example `37 files · 49.8 MB · 37 uncompressed (49.8 MB)`.
+- Budgets in `meshdiet.toml` (found in the scanned folder or the current one, or `--config FILE`):
+  SIZE-001 flags a file over `file_max` (5 MB by default) with its size split and biggest image,
+  SIZE-002 flags the whole build over `build_max`, and SIZE-003 flags a `[pages]` group over its `max`
+  with its five largest assets. A page glob that matches nothing is reported as CFG-PAGE, so a typo
+  cannot switch a budget off. The other `meshdiet.toml` keys arrive in a later version.
+- `--gzip` adds a gzip -6 transfer estimate per file, per page and in total, labelled as an estimate.
+  The JSON report gains `pages` and the new `totals` fields.

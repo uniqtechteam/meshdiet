@@ -7,6 +7,7 @@ third-party, downloaded or client model is ever committed.
 <RULE-ID>/bad/            files that must produce exactly the findings in bad/expected.json
 <RULE-ID>/bad/expected.json   [{ "rule": "MESH-001", "path": "dense.glb", "value": 1067784 }]  (value optional)
 <RULE-ID>/good/           a near miss that must produce no finding of that rule
+<RULE-ID>/*/meshdiet.toml     budgets for that folder (SIZE-002, SIZE-003); the harness scans with it
 demo-site/                a tiny three.js page with planted problems (see its README)
 ```
 

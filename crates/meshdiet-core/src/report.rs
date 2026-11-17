@@ -9,6 +9,8 @@ use std::time::{Duration, Instant};
 use serde::Serialize;
 
 use crate::rule::{self, GLTF_001, Rule};
+use crate::rules::size;
+use crate::weight::{self, PageTotal, Totals};
 use crate::{Asset, Confidence, Config, Finding, Measured, Severity, asset, walk};
 
 /// Version of the JSON report shape. Bumped only on breaking changes.
@@ -21,6 +23,8 @@ pub struct Options {
     pub config: Config,
     /// Called with each asset path before it is read (`--verbose`).
     pub progress: Option<fn(&str)>,
+    /// Compute the gzip transfer estimate (`--gzip`); reads every byte of every file.
+    pub gzip: bool,
 }
 
 /// Counts per severity.
@@ -32,17 +36,6 @@ pub struct Summary {
     pub medium: usize,
     /// Low findings.
     pub low: usize,
-}
-
-/// Totals over the whole scan. A file shared by several assets counts once.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
-pub struct Totals {
-    /// Assets scanned.
-    pub assets: usize,
-    /// Distinct files (assets plus their external buffers and images).
-    pub files: usize,
-    /// Bytes of those files.
-    pub bytes: u64,
 }
 
 /// Everything a scan produced.
@@ -58,8 +51,14 @@ pub struct Report {
     pub duration_ms: u128,
     /// Every asset, sorted by path.
     pub assets: Vec<Asset>,
-    /// Totals.
+    /// Totals, shared files once.
     pub totals: Totals,
+    /// Page groups from `[pages]`, then `(no page)`; empty without pages.
+    pub pages: Vec<PageTotal>,
+    /// gzip level 6 size of every file (`--gzip`), keyed by path. An estimate: servers may use
+    /// brotli or nothing.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub gzip_estimate: BTreeMap<String, u64>,
     /// Findings, most severe first.
     pub findings: Vec<Finding>,
     /// Counts per severity.
@@ -113,18 +112,32 @@ fn unreadable(asset: &Asset, problem: &str) -> Finding {
     }
 }
 
-/// Totals with shared files counted once.
-fn totals(assets: &[Asset]) -> Totals {
-    let mut files = BTreeMap::new();
-    for a in assets {
-        for (path, bytes) in a.files.iter().zip(&a.file_bytes) {
-            files.insert(path.as_str(), *bytes);
+struct Weighed {
+    totals: Totals,
+    pages: weight::Pages,
+    gzip: BTreeMap<String, u64>,
+}
+
+/// Totals, page groups and, with `--gzip`, the transfer estimate.
+fn weigh(assets: &[Asset], root: &std::path::Path, root_shown: &str, options: &Options) -> Weighed {
+    let mut totals = weight::totals(assets, &options.config);
+    let mut pages = weight::pages(assets, &options.config.pages, root_shown);
+    let gzip = if options.gzip {
+        weight::gzip_files(assets, root)
+    } else {
+        BTreeMap::new()
+    };
+    if options.gzip {
+        totals.gzip = Some(weight::gzip_of(assets, &gzip));
+        for page in &mut pages.totals {
+            let members = assets.iter().filter(|a| page.assets.contains(&a.path));
+            page.gzip = Some(weight::gzip_of(members, &gzip));
         }
     }
-    Totals {
-        assets: assets.len(),
-        files: files.len(),
-        bytes: files.values().sum(),
+    Weighed {
+        totals,
+        pages,
+        gzip,
     }
 }
 
@@ -170,6 +183,19 @@ pub fn scan_with(
         }
         assets.push(asset);
     }
+    let root_shown = walked.root.to_string_lossy().replace('\\', "/");
+    let weighed = weigh(&assets, &walked.root, &root_shown, options);
+    let config_path = options.config.source.as_deref().map_or_else(
+        || "meshdiet.toml".to_owned(),
+        |p| walk::relative(&walked.root, p),
+    );
+    findings.extend(size::build_findings(
+        &assets,
+        &weighed.totals,
+        &weighed.pages,
+        &options.config,
+        &config_path,
+    ));
     findings.sort_by(|a, b| {
         b.severity
             .cmp(&a.severity)
@@ -187,9 +213,11 @@ pub fn scan_with(
     Ok(Report {
         schema: SCHEMA,
         version: crate::VERSION,
-        root: walked.root.to_string_lossy().replace('\\', "/"),
+        root: root_shown,
         duration_ms: started.elapsed().as_millis(),
-        totals: totals(&assets),
+        totals: weighed.totals,
+        pages: weighed.pages.totals,
+        gzip_estimate: weighed.gzip,
         assets,
         findings,
         summary,
@@ -209,6 +237,8 @@ mod tests {
             duration_ms: 0,
             assets: Vec::new(),
             totals: Totals::default(),
+            pages: Vec::new(),
+            gzip_estimate: BTreeMap::new(),
             findings: vec![Finding {
                 rule: "TEST-001".into(),
                 title: "t".into(),

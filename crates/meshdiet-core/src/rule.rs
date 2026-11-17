@@ -51,6 +51,7 @@ pub fn all() -> Vec<Box<dyn Rule>> {
         Box::new(mesh::UnusedBufferBytes),
     ];
     rules.extend(crate::rules::texture::rules());
+    rules.push(Box::new(crate::rules::size::FileOverBudget));
     rules
 }
 
@@ -59,6 +60,7 @@ pub fn all() -> Vec<Box<dyn Rule>> {
 pub fn catalogue() -> Vec<&'static RuleInfo> {
     let mut list: Vec<&'static RuleInfo> = all().iter().map(|r| r.info()).collect();
     list.push(&GLTF_001);
+    list.extend(crate::rules::size::BUILD_RULES);
     list.sort_by_key(|i| i.id);
     list
 }

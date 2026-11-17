@@ -2,7 +2,8 @@
 //!
 //! `bad/` must produce exactly the findings listed in `bad/expected.json`; `good/` must produce none
 //! of that rule. A new rule adds folders, not test code. Rules the engine does not have yet are
-//! checked for shape only (the folder is complete and `expected.json` is valid).
+//! checked for shape only (the folder is complete and `expected.json` is valid). A folder with a
+//! `meshdiet.toml` is scanned with it, for the budget rules.
 
 #![allow(
     clippy::panic,
@@ -63,9 +64,23 @@ fn engine_rules() -> Vec<&'static str> {
         .collect()
 }
 
+/// Options for `dir`: its `meshdiet.toml` when it has one (budget rules), else the defaults.
+fn options(dir: &Path) -> meshdiet_core::Options {
+    let file = dir.join("meshdiet.toml");
+    let config = if file.is_file() {
+        meshdiet_core::Config::load(&file).unwrap_or_else(|e| panic!("{e}"))
+    } else {
+        meshdiet_core::Config::default()
+    };
+    meshdiet_core::Options {
+        config,
+        ..meshdiet_core::Options::default()
+    }
+}
+
 /// Findings the engine reports for `dir`, as (rule, path, value).
 fn engine_findings(dir: &Path) -> Vec<Expected> {
-    meshdiet_core::scan(&[dir.to_path_buf()], &meshdiet_core::Options::default())
+    meshdiet_core::scan(&[dir.to_path_buf()], &options(dir))
         .unwrap_or_else(|e| panic!("{}: {e}", dir.display()))
         .findings
         .into_iter()

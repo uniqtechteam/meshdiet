@@ -17,6 +17,9 @@ ignore.workspace = true
 base64.workspace = true
 imagesize.workspace = true
 ktx2.workspace = true
+toml.workspace = true
+globset.workspace = true
+flate2.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

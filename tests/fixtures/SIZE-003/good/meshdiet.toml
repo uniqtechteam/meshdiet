@@ -1,0 +1,3 @@
+[pages]
+"/" = { assets = ["models/home/*.glb"], max = "1 MB" }
+"/shop" = { assets = ["models/shop/*.glb"], max = "2.2 MB" }

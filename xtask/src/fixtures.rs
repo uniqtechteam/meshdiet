@@ -28,6 +28,8 @@ pub fn all() -> Vec<File> {
     tex_004(&mut out);
     load_001(&mut out);
     size_001(&mut out);
+    size_002(&mut out);
+    size_003(&mut out);
     demo_site(&mut out);
     out
 }
@@ -386,6 +388,49 @@ fn size_001(out: &mut Vec<File>) {
         "SIZE-001/good",
         vec![("dense.glb".into(), dense().glb())],
     );
+}
+
+/// Two copies of the 1.07 MB dense model (git stores the content once) under a 2 MB build budget;
+/// the near miss allows 2.2 MB.
+fn size_002(out: &mut Vec<File>) {
+    for (dir, max) in [("SIZE-002/bad", "2 MB"), ("SIZE-002/good", "2.2 MB")] {
+        let dense = dense().glb();
+        add(
+            out,
+            dir,
+            vec![
+                ("models/table.glb".into(), dense.clone()),
+                ("models/desk.glb".into(), dense),
+                (
+                    "meshdiet.toml".into(),
+                    format!("[budgets]\nbuild_max = \"{max}\"\n").into_bytes(),
+                ),
+            ],
+        );
+    }
+    expected(out, "SIZE-002/bad", "SIZE-002", &["meshdiet.toml"]);
+}
+
+/// A `/shop` page of two dense models over a 2 MB page budget, next to a home page that is fine;
+/// the near miss allows 2.2 MB.
+fn size_003(out: &mut Vec<File>) {
+    for (dir, max) in [("SIZE-003/bad", "2 MB"), ("SIZE-003/good", "2.2 MB")] {
+        let dense = dense().glb();
+        let config = format!(
+            "[pages]\n\"/\" = {{ assets = [\"models/home/*.glb\"], max = \"1 MB\" }}\n\"/shop\" = {{ assets = [\"models/shop/*.glb\"], max = \"{max}\" }}\n"
+        );
+        add(
+            out,
+            dir,
+            vec![
+                ("models/home/box.glb".into(), cube().glb()),
+                ("models/shop/table.glb".into(), dense.clone()),
+                ("models/shop/desk.glb".into(), dense),
+                ("meshdiet.toml".into(), config.into_bytes()),
+            ],
+        );
+    }
+    expected(out, "SIZE-003/bad", "SIZE-003", &["meshdiet.toml"]);
 }
 
 const DEMO_HTML: &str = "<!doctype html>

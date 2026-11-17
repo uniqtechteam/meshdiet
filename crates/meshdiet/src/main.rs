@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand, ValueEnum};
-use meshdiet_core::{FailOn, Options, Severity};
+use meshdiet_core::{Config, FailOn, Options, Severity};
 
 /// Find the 3D models that make your website slow.
 #[derive(Parser)]
@@ -51,6 +51,15 @@ struct ScanArgs {
     /// Print each file on stderr as it is read.
     #[arg(long, short)]
     verbose: bool,
+    /// Budgets and page groups [default: meshdiet.toml in the scanned folder, else here].
+    #[arg(long, value_name = "FILE")]
+    config: Option<PathBuf>,
+    /// Add a gzip -6 transfer estimate per file (reads every byte).
+    #[arg(long)]
+    gzip: bool,
+    /// Show every row of the weight table, not only the 20 largest.
+    #[arg(long)]
+    all: bool,
 }
 
 /// How the report is written.
@@ -94,10 +103,30 @@ fn progress(path: &str) {
     eprintln!("reading {path}");
 }
 
+/// `--config`, else `meshdiet.toml` in the one folder given, else in the current folder, else the
+/// defaults.
+fn config(args: &ScanArgs) -> Result<Config, String> {
+    if let Some(file) = &args.config {
+        return Config::load(file);
+    }
+    let mut candidates = Vec::new();
+    if let [dir] = args.paths.as_slice()
+        && dir.is_dir()
+    {
+        candidates.push(dir.join("meshdiet.toml"));
+    }
+    candidates.push(PathBuf::from("meshdiet.toml"));
+    match candidates.into_iter().find(|p| p.is_file()) {
+        Some(file) => Config::load(&file),
+        None => Ok(Config::default()),
+    }
+}
+
 fn scan(args: &ScanArgs) -> Result<ExitCode, String> {
     let options = Options {
+        config: config(args)?,
         progress: args.verbose.then_some(progress as fn(&str)),
-        ..Options::default()
+        gzip: args.gzip,
     };
     let report = meshdiet_core::scan(&args.paths, &options)?;
     for err in &report.internal_errors {
@@ -112,7 +141,14 @@ fn scan(args: &ScanArgs) -> Result<ExitCode, String> {
     let to_terminal = args.output.is_none() && std::io::stdout().is_terminal();
     let color = to_terminal && std::env::var_os("NO_COLOR").is_none_or(|v| v.is_empty());
     let text = match args.format {
-        Format::Pretty => output::pretty(&report, color, args.quiet),
+        Format::Pretty => output::pretty(
+            &report,
+            &output::Style {
+                color,
+                quiet: args.quiet,
+                all_rows: args.all,
+            },
+        ),
         Format::Json => output::json(&report),
     };
     match &args.output {
