@@ -122,6 +122,10 @@ pub struct Asset {
     pub compression: Compression,
     /// Images.
     pub images: Vec<ImageInfo>,
+    /// A compressed copy of this model next to it (`chair-compressed.glb`), which the app loads
+    /// instead; per-file rules skip this one. Set by the scan, not by [`read`].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub compressed_copy: Option<String>,
     /// What could not be read; each becomes a GLTF-001 finding.
     #[serde(skip)]
     pub problems: Vec<String>,
@@ -265,6 +269,7 @@ pub fn read(rel: &str, abs: &Path) -> Asset {
             primitives: 0,
             compression: Compression::default(),
             images: Vec::new(),
+            compressed_copy: None,
             problems: Vec::new(),
             file_bytes: Vec::new(),
             document: None,

@@ -264,6 +264,10 @@ fn skip_reason(a: &Asset, flagged: bool, options: &FixOptions) -> Option<String>
         "already compressed with Draco, which gltfpack cannot read"
     } else if already_compressed(a) {
         "already compressed (meshopt geometry, KTX2 or WebP textures)"
+    } else if let Some(copy) = a.compressed_copy.as_deref().filter(|_| !options.all) {
+        return Some(format!(
+            "the app loads its compressed copy {copy}; --all compresses it anyway"
+        ));
     } else if !flagged && !options.all {
         "no MESH-001 or TEX finding; --all compresses it anyway"
     } else if contained(&a.path).is_none() {

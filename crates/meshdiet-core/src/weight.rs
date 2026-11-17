@@ -124,10 +124,10 @@ pub fn distinct_bytes<'a>(assets: impl IntoIterator<Item = &'a Asset>) -> u64 {
 }
 
 /// True when MESH-001 flags the asset: a primitive with no Draco or meshopt, in an asset with at
-/// least `compress_min` of such geometry.
+/// least `compress_min` of such geometry, and no compressed copy next to it that the app loads.
 #[must_use]
 pub fn has_uncompressed_geometry(asset: &Asset, config: &Config) -> bool {
-    !UncompressedGeometry.check(asset, config).is_empty()
+    asset.compressed_copy.is_none() && !UncompressedGeometry.check(asset, config).is_empty()
 }
 
 /// Estimated GPU memory of one asset's textures.

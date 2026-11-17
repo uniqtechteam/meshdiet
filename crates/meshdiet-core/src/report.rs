@@ -15,7 +15,9 @@ use crate::rules::load;
 use crate::rules::size;
 use crate::source_index::SourceIndex;
 use crate::weight::{self, PageTotal, Totals};
-use crate::{Asset, Confidence, Config, Finding, Ignore, Measured, Severity, asset, walk};
+use crate::{
+    Asset, Confidence, Config, Finding, Ignore, Measured, Severity, asset, variants, walk,
+};
 
 /// Version of the JSON report shape. Bumped only on breaking changes.
 pub const SCHEMA: u32 = 1;
@@ -250,19 +252,39 @@ pub fn scan_with(
         }
         let asset = asset::read(&file.rel, &file.abs);
         findings.extend(asset.problems.iter().map(|p| unreadable(&asset, p)));
-        if asset.document.is_some() {
-            for rule in rules.iter().filter(|r| options.runs(r.id())) {
-                match catch_unwind(AssertUnwindSafe(|| rule.check(&asset, &options.config))) {
-                    Ok(found) => findings.extend(found),
-                    Err(_) => internal_errors.push(format!(
-                        "internal error in {} on {}",
-                        rule.id(),
-                        asset.path
-                    )),
-                }
+        assets.push(asset);
+    }
+    let copies = variants::copies(&assets);
+    let load_runs = options.runs(load::LOAD_001.id) && assets.iter().any(load::needs_decoder);
+    let sources = (load_runs || !copies.is_empty()).then(|| {
+        let names: Vec<String> = copies
+            .keys()
+            .map(|p| variants::file_name(p).to_owned())
+            .collect();
+        SourceIndex::for_scan(&walked.root, options.src.as_deref(), &names)
+    });
+    for asset in &mut assets {
+        // the app loads the copy, unless its code names the original file itself
+        asset.compressed_copy = copies.get(&asset.path).cloned().filter(|_| {
+            !sources
+                .as_ref()
+                .is_some_and(|s| s.mentions(variants::file_name(&asset.path)))
+        });
+    }
+    for asset in assets
+        .iter()
+        .filter(|a| a.document.is_some() && a.compressed_copy.is_none())
+    {
+        for rule in rules.iter().filter(|r| options.runs(r.id())) {
+            match catch_unwind(AssertUnwindSafe(|| rule.check(asset, &options.config))) {
+                Ok(found) => findings.extend(found),
+                Err(_) => internal_errors.push(format!(
+                    "internal error in {} on {}",
+                    rule.id(),
+                    asset.path
+                )),
             }
         }
-        assets.push(asset);
     }
     let weighed = weigh(&assets, &walked.root, &root_shown, options);
     let config_path = options.config.source.as_deref().map_or_else(
@@ -276,9 +298,8 @@ pub fn scan_with(
         &options.config,
         &config_path,
     ));
-    if options.runs(load::LOAD_001.id) && assets.iter().any(load::needs_decoder) {
-        let sources = SourceIndex::for_scan(&walked.root, options.src.as_deref());
-        findings.extend(load::check(&assets, &sources));
+    if load_runs && let Some(sources) = &sources {
+        findings.extend(load::check(&assets, sources));
     }
     findings.extend(no_reason(&options.config, &config_path));
     findings.retain(|f| options.runs(&f.rule));

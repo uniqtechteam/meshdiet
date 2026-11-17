@@ -291,12 +291,19 @@ fn weight_table(
     let mut rows = vec![header.iter().map(|h| (*h).to_owned()).collect::<Vec<_>>()];
     for a in &assets[..shown] {
         let shared = a.files.iter().any(|f| owners.get(f.as_str()) > Some(&1));
+        let mut label = a.path.clone();
+        if shared {
+            label.push_str(" (shared)");
+        }
+        if let Some(copy) = &a.compressed_copy {
+            let _ = write!(
+                label,
+                " (source of {})",
+                meshdiet_core::variants::file_name(copy)
+            );
+        }
         let mut row = vec![
-            if shared {
-                format!("{} (shared)", a.path)
-            } else {
-                a.path.clone()
-            },
+            label,
             size(a.bytes),
             size(a.geometry_bytes),
             size(a.texture_bytes),

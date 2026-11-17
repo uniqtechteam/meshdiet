@@ -423,6 +423,7 @@ mod tests {
             primitives: 0,
             compression: Compression::default(),
             images,
+            compressed_copy: None,
             problems: Vec::new(),
             file_bytes: Vec::new(),
             document: Document::parse(json.as_bytes()).ok(),

@@ -209,8 +209,16 @@ fn mesh_001(out: &mut Vec<File>) {
         vec![("dense.glb".into(), dense().glb())],
     );
     expected(out, "MESH-001/bad", "MESH-001", &["dense.glb"]);
-    // dense-meshopt.glb and dense-draco.glb are made by tools (README)
-    add(out, "MESH-001/good", vec![("box.glb".into(), cube().glb())]);
+    // dense-meshopt.glb and dense-draco.glb are made by tools (README); dense.glb is their
+    // uncompressed source, shipped next to them as build scripts do, so the app loads a copy
+    add(
+        out,
+        "MESH-001/good",
+        vec![
+            ("box.glb".into(), cube().glb()),
+            ("dense.glb".into(), dense().glb()),
+        ],
+    );
 }
 
 fn crowd(instances: u16) -> Vec<u8> {
