@@ -58,8 +58,8 @@ pub struct Document {
     /// parts, images and extensions such as Draco.
     #[serde(skip)]
     pub view_refs: BTreeSet<usize>,
-    /// Materials (only counted and named).
-    pub materials: Vec<Named>,
+    /// Materials (names and the normal map, nothing else).
+    pub materials: Vec<Material>,
 }
 
 /// `asset`.
@@ -78,6 +78,24 @@ pub struct AssetMeta {
 pub struct Named {
     /// Its name.
     pub name: Option<String>,
+}
+
+/// A material: only what the rules need.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Material {
+    /// Its name.
+    pub name: Option<String>,
+    /// The normal map, if any.
+    pub normal_texture: Option<TextureRef>,
+}
+
+/// A reference from a material to a texture.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default)]
+pub struct TextureRef {
+    /// Texture index.
+    pub index: usize,
 }
 
 /// A scene: its root nodes.
@@ -260,6 +278,18 @@ pub struct Texture {
     pub source: Option<usize>,
     /// Extensions, such as `KHR_texture_basisu`.
     pub extensions: Extensions,
+}
+
+impl Texture {
+    /// The KTX2 image of `KHR_texture_basisu`, if the texture has one.
+    #[must_use]
+    pub fn basisu_source(&self) -> Option<usize> {
+        self.extensions
+            .get(KHR_BASISU)?
+            .get("source")?
+            .as_u64()
+            .and_then(|s| usize::try_from(s).ok())
+    }
 }
 
 impl Document {
