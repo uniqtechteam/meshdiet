@@ -3,6 +3,7 @@
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
+use meshdiet_core::baseline::tolerance_label;
 use meshdiet_core::{Asset, Finding, Report, Severity};
 
 const RESET: &str = "\x1b[0m";
@@ -23,9 +24,13 @@ pub fn size(bytes: u64) -> String {
 }
 
 /// Rows of the weight table shown without `--all`.
-const TOP_ROWS: usize = 20;
+pub const TOP_ROWS: usize = 20;
 
 /// How pretty output looks.
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "independent display switches from the command line"
+)]
 pub struct Style {
     /// ANSI colours.
     pub color: bool,
@@ -33,6 +38,8 @@ pub struct Style {
     pub quiet: bool,
     /// Every row of the weight table.
     pub all_rows: bool,
+    /// List the findings `ignore` entries keep out, with their reasons.
+    pub show_ignored: bool,
 }
 
 /// The one-line summary:
@@ -59,10 +66,18 @@ pub fn summary_line(report: &Report) -> String {
     }
     let _ = write!(
         line,
-        " · {} high · {} medium · {} low · scanned in {:.2}s",
-        s.high,
-        s.medium,
-        s.low,
+        " · {} high · {} medium · {} low",
+        s.high, s.medium, s.low
+    );
+    if let Some(b) = &report.baseline {
+        let _ = write!(line, " · {} in baseline", b.known);
+    }
+    if !report.ignored.is_empty() {
+        let _ = write!(line, " · {} ignored", report.ignored.len());
+    }
+    let _ = write!(
+        line,
+        " · scanned in {:.2}s",
         report.duration().as_secs_f64()
     );
     line
@@ -82,7 +97,15 @@ pub fn pretty(report: &Report, style: &Style) -> String {
     let mut out = String::new();
     if !style.quiet {
         if report.findings.is_empty() && !report.assets.is_empty() {
-            let _ = writeln!(out, "No problems found.\n");
+            let _ = writeln!(
+                out,
+                "{}\n",
+                if report.baseline.is_some() {
+                    "Nothing new since the baseline."
+                } else {
+                    "No problems found."
+                }
+            );
         }
         let mut last_path = None;
         for f in &report.findings {
@@ -104,6 +127,8 @@ pub fn pretty(report: &Report, style: &Style) -> String {
         if !report.findings.is_empty() {
             out.push('\n');
         }
+        baseline_notes(&mut out, report, &paint);
+        ignored_list(&mut out, report, style.show_ignored, &paint);
         weight_table(&mut out, report, style.all_rows, &paint);
         page_table(&mut out, report, &paint);
     }
@@ -111,8 +136,79 @@ pub fn pretty(report: &Report, style: &Style) -> String {
     out
 }
 
+/// What the baseline hid, and the files that got smaller or went away (SPEC-CLI-001 FR-007).
+fn baseline_notes(out: &mut String, report: &Report, paint: &dyn Fn(&str, &str) -> String) {
+    let Some(b) = &report.baseline else {
+        return;
+    };
+    let _ = writeln!(
+        out,
+        "{} {} known {} hidden (tolerance {})",
+        paint(BOLD, &format!("Baseline {}:", b.file)),
+        b.known,
+        if b.known == 1 { "finding" } else { "findings" },
+        tolerance_label(b.tolerance)
+    );
+    for c in &b.removed {
+        let _ = writeln!(out, "  improved  {} removed ({})", c.path, size(c.before));
+    }
+    for c in &b.shrunk {
+        let _ = writeln!(
+            out,
+            "  improved  {} shrank from {} to {}",
+            c.path,
+            size(c.before),
+            size(c.after)
+        );
+    }
+    out.push('\n');
+}
+
+/// `--show-ignored`: every finding an `ignore` entry keeps out; otherwise one line with the count.
+fn ignored_list(
+    out: &mut String,
+    report: &Report,
+    show: bool,
+    paint: &dyn Fn(&str, &str) -> String,
+) {
+    let n = report.ignored.len();
+    if n == 0 {
+        return;
+    }
+    if !show {
+        let _ = writeln!(
+            out,
+            "{}\n",
+            paint(
+                DIM,
+                &format!(
+                    "{n} {} ignored by meshdiet.toml (--show-ignored lists them)",
+                    if n == 1 { "finding" } else { "findings" }
+                )
+            )
+        );
+        return;
+    }
+    let _ = writeln!(out, "{}", paint(BOLD, "Ignored by meshdiet.toml"));
+    for i in &report.ignored {
+        let f = &i.finding;
+        let _ = writeln!(
+            out,
+            "  {}  {}  {}  {}",
+            f.rule,
+            f.path,
+            f.message,
+            paint(
+                DIM,
+                &format!("({})", i.reason.as_deref().unwrap_or("no reason given"))
+            )
+        );
+    }
+    out.push('\n');
+}
+
 /// `draco+ktx2`, or `none`.
-fn compression(a: &Asset) -> String {
+pub fn compression(a: &Asset) -> String {
     let c = a.compression;
     let used: Vec<&str> = [
         (c.draco, "draco"),
