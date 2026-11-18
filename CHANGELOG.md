@@ -6,6 +6,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-18
+
+The first release.
+
 ### Added
 
 - Project setup: the `meshdiet` command line tool and the `meshdiet-core` engine.
@@ -113,3 +117,6 @@ These come from scanning 12 public projects that ship glTF models.
   `EXT_structural_metadata` or `EXT_mesh_manifold`) or a custom `_NAME` vertex attribute; before, the
   output passed its checks with that data gone. A node or material named `""` no longer counts as
   named, so files with empty names are not kept back for nothing.
+
+[Unreleased]: https://github.com/uniqtechteam/meshdiet/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/uniqtechteam/meshdiet/releases/tag/v0.1.0
