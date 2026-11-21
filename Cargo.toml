@@ -21,7 +21,7 @@ tempfile = "3"
 # Tests only: checks the SARIF output against the official 2.1.0 schema.
 jsonschema = { version = "0.61", default-features = false }
 ignore = "0.4"
-base64 = "0.22"
+base64 = "0.23"
 # Header-only image sizing: no pixel decoding (ADR-003).
 imagesize = { version = "0.15", default-features = false, features = ["png", "jpeg", "webp", "heif", "ktx2"] }
 ktx2 = "0.5"
