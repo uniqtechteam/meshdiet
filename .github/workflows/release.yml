@@ -125,6 +125,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     steps:
       # keeps the token: this job pushes the moving major tag with git
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -134,6 +136,10 @@ jobs:
           merge-multiple: true
       - name: checksums
         run: cd dist && sha256sum -- * > SHA256SUMS && cat SHA256SUMS
+      # build provenance for every archive: gh attestation verify <file> --repo uniqtechteam/meshdiet
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/*
       - name: release notes from CHANGELOG.md
         env:
           VERSION: ${{ needs.version.outputs.version }}
